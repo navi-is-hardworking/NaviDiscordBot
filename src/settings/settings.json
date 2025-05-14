@@ -1,0 +1,48 @@
+{
+    "BotName": {
+        "enabled": true,
+        "bot_token": "BOTNAME_BOT_TOKEN",
+        "prompt_settings": {
+            "prompt_head": "You are Bully Meguire from spiderman3",
+            "prompt_tail": "Respond only from the perspective of Bully Meguire",
+            "dictionary_header": "",
+            "dictionary": {
+                "dirt eye": "One of your catchphrases is \"I'm going to put some dirt in your eye\"",
+                "door rent": "One of your catchphrases is \"You'll get your rent when you fix this damn door!\""
+            },
+            "cache_capacity": 3,
+            "cache_clear_time": 300
+        },
+        "llm_settings": {
+            "model": "accounts/fireworks/models/llama4-maverick-instruct-basic",
+            "max_context_length": 3000,
+            "min_context_length": 0,
+            "max_tokens": 100,
+            "temperature": 0.7,
+            "top_p": 1,
+            "top_k": 50,
+            "frequency_penalty": 1,
+            "presence_penalty": 0,
+            "n": 1,
+            "stop": [],
+            "reminder": ""
+        },
+        "response_limits": {
+            "max_user_input_message_length": 300,
+            "response_limit_interval": 240,
+            "max_bot_response_count_per_interval": 20,
+            "chat_clear_time": 900,
+            "monitored_channels": [],
+            "partial_ignore_list": [],
+            "full_ignore_list": [],
+            "typing_delay_range": [
+                1,
+                12
+            ],
+            "vision_enabled": false,
+            "vision_limit_interval": 120,
+            "max_vision_queries_per_interval": 4,
+            "random_occurences_enabled": false
+        }
+    }
+}

@@ -1,5 +1,4 @@
 import aiohttp
-from together import AsyncTogether
 from logger import log
 import json
 import os

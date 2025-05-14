@@ -41,7 +41,7 @@ if not exist src/.env (
 
 :: Install required packages
 echo Installing requirements...
-pip install discord.py aiohttp python-dotenv json5 httpx together
+pip install discord.py aiohttp python-dotenv json5 httpx dotenv
 
 :: Show what files exist in the directory
 echo Files in current directory:

@@ -33,6 +33,9 @@ class CompletionGenerator:
         
         async with aiohttp.ClientSession() as session:
             async with session.post(self.url, json=payload, headers=headers, timeout=timeout) as response:
-                response_data = await response.text()
-                response_json = json.loads(response_data)
-                return response_json
+                try: 
+                    response_data = await response.text()
+                    response_json = json.loads(response_data)
+                    return response_json
+                except Exception as e:
+                    log.error(f"failed to get completion generation: {e}, {response_data}")

@@ -550,6 +550,7 @@ function renameModel(oldName) {
             activeTab = newName;
         }
         
+        // need to update token name
         updateDeleteButtonVisibility();
         setUnsavedChanges();
         showNotification(`Bot renamed from "${escapeHtml(oldName)}" to "${escapeHtml(newName)}"`, 'success');

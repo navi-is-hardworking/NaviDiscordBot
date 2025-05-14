@@ -26,7 +26,7 @@ class DiscordBot:
         
         self.monitored_channels = [int(x) for x in setting_dictionary['monitored_channels']]
         self.partial_ignore_list = [int(x) for x in setting_dictionary['partial_ignore_list']]
-        self.full_ignore_list = [int(x) for x in setting_dictionary['full_ignore_list']]
+        full_ignore_list = [int(x) for x in setting_dictionary['full_ignore_list']]
         
         self.typing_delay_range = setting_dictionary['typing_delay_range']
         self.rate_limiter = RateLimit(

@@ -26,7 +26,7 @@ class DiscordBot:
         
         self.monitored_channels = [int(x) for x in setting_dictionary['monitored_channels']]
         self.partial_ignore_list = [int(x) for x in setting_dictionary['partial_ignore_list']]
-        full_ignore_list = [int(x) for x in setting_dictionary['full_ignore_list']]
+        self.full_ignore_list = [int(x) for x in setting_dictionary['full_ignore_list']]
         
         self.typing_delay_range = setting_dictionary['typing_delay_range']
         self.rate_limiter = RateLimit(
@@ -169,19 +169,28 @@ class DiscordBot:
     
     ######## Where messages comes in / main logic ########
     async def on_message(self, message: discord.Message):
+        # print("recieved message1")
+        # print(f"author({message.author == self.bot.user})")
+        # print(f"ignore({message.author.id in self.full_ignore_list})")
+        # print(f"comment({not message.content.find("!")})")
+        
         if message.author == self.bot.user or message.author.id in self.full_ignore_list or not message.content.find("!"):
             return
         
+        print("recieved message2")
         if message.channel.id not in self.monitored_channels:
             if self.handle_random_occurance(message):
                 return True
                 
+        print("recieved message3")
         if len(message.content) == 0 and len(message.attachments) == 0:
             return
             
+        print("recieved message4")
         if self.rate_limiter.full():
             return
             
+        print("recieved message5")
         # log.debug(f"raw message: {message.content}")
         # log.debug(f"attachments: {message.attachments}")
         # log.debug(f"author: {message.author}")

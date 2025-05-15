@@ -18,7 +18,7 @@ class VisionProcessor:
             self.prompt = "Describe the image in a short but dense description. Use keywords and positional terms only. # Example: green house on hill, surrounded by dense ivy. Dark night. Single Dim lamp on left side of porch"
             
         self.api_key = os.environ.get("API_BOT_TOKEN")
-        self.url = os.environ.get("VISION_ENDPOINT")
+        self.url = os.environ.get("VISION_ENDPOINT", "https://api.fireworks.ai/inference/v1/chat/completions")
         self.model = os.environ.get("VISION_MODEL", "accounts/fireworks/models/llama4-scout-instruct-basic")
         self.rate_limiter = RateLimit(limit=max_requests, interval=interval)
         

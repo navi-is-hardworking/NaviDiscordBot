@@ -35,6 +35,7 @@ class CompletionGenerator:
             async with session.post(self.url, json=payload, headers=headers, timeout=timeout) as response:
                 try: 
                     response_data = await response.text()
+                    log.debug(response_data)
                     response_json = json.loads(response_data)
                     return response_json
                 except Exception as e:

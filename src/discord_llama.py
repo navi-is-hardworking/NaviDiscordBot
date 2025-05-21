@@ -119,6 +119,7 @@ class discord_llama:
         return self.vision_client.is_vision_enabled()
     
     async def generate_response(self) -> str:
+        
         message = ""
         request = {}
         try:
@@ -136,8 +137,9 @@ class discord_llama:
             think_end = message.find("</think>")
             if message and think_end >= 0:
                 message = message[think_end+len("</think>"):].strip()
-            else:
-                log.error("Tried to think but did not finish thinking")
+            elif message.find("<think>") > 0:
+                log.error("tried to think but failed to finish though")
+                return 
                 
             log.debug(f"{initial_len - len(message)} think characters removed")
             if message and message[0] == "<":

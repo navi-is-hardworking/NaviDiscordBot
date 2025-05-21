@@ -121,6 +121,7 @@ class DiscordBot:
         
     
     async def start(self):
+        log.debug(f"Environment variable {self.bot_token_location}")
         token = os.environ.get(self.bot_token_location)
         if not token:
             log.error(f"Environment variable {self.bot_token_location} not set!")

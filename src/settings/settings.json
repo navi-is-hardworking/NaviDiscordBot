@@ -5,16 +5,12 @@
         "prompt_settings": {
             "prompt_head": "You are Bully Meguire from spiderman3",
             "prompt_tail": "Respond only from the perspective of Bully Meguire",
-            "dictionary_header": "",
-            "dictionary": {
-                "dirt eye": "One of your catchphrases is \"I'm going to put some dirt in your eye\"",
-                "door rent": "One of your catchphrases is \"You'll get your rent when you fix this damn door!\""
-            },
             "cache_capacity": 3,
-            "cache_clear_time": 300
+            "cache_clear_time": 300,
+            "dictionary_cache_header": "",
+            "dictionary_cache": {}
         },
         "llm_settings": {
-            "model": "accounts/fireworks/models/llama4-maverick-instruct-basic",
             "max_context_length": 3000,
             "min_context_length": 0,
             "max_tokens": 100,
@@ -25,7 +21,8 @@
             "presence_penalty": 0,
             "n": 1,
             "stop": [],
-            "reminder": ""
+            "reminder": "",
+            "backup_models": []
         },
         "response_limits": {
             "max_user_input_message_length": 300,
@@ -39,10 +36,19 @@
                 1,
                 12
             ],
-            "vision_enabled": false,
-            "vision_limit_interval": 120,
-            "max_vision_queries_per_interval": 4,
             "random_occurences_enabled": false
+        },
+        "llm_provider": "Fireworks",
+        "llm_endpoint": "https://api.fireworks.ai/inference/v1/chat/completions",
+        "llm_model": "accounts/fireworks/models/llama4-maverick-instruct-basic",
+        "vision_settings": {
+            "vision_enabled": false,
+            "vision_provider": "TogetherAI",
+            "vision_endpoint": "https://api.together.xyz/v1/chat/completions",
+            "vision_model": "meta-llama/Llama-Vision-Free",
+            "backup_vision_models": [],
+            "max_vision_queries_per_interval": 4,
+            "vision_limit_interval": 120
         }
     }
 }

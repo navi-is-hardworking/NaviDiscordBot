@@ -40,15 +40,15 @@ if __name__ == "__main__":
         (
             prompt_tail,
             prompt_head,
-            dictionary_header,
+            cache_header,
             definition_dictionary
-        ) =  settings['prompt_settings']['prompt_head'], settings['prompt_settings']['prompt_tail'], settings['prompt_settings']['dictionary_header'], settings['prompt_settings']['dictionary']
+        ) =  settings['prompt_settings']['prompt_head'], settings['prompt_settings']['prompt_tail'], settings['prompt_settings']['cache_header'], settings['prompt_settings']['dictionary_cache']
         
         pm = PromptManager()
         pm.configure(
             prompt_tail,
             prompt_head,
-            dictionary_header,
+            cache_header,
             definition_dictionary,
             settings['prompt_settings']['cache_capacity'],
             settings['prompt_settings']['cache_clear_time']

@@ -128,7 +128,7 @@ class discord_llama:
             message: str = request['choices'][0]['message']['content']
             # log.debug(f"response length{len(message)}")
             initial_len = len(message)
-            self.output_tokens += request['usage']['prompt_tokens']
+            self.input_tokens += request['usage']['prompt_tokens']
             self.output_tokens += request['usage']['completion_tokens']
             log.info(f"==usage==\ninput: {self.input_tokens}\noutput: {self.output_tokens}")
             

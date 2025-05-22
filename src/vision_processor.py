@@ -4,32 +4,37 @@ import json
 import os
 import re
 from rate_limit import RateLimit
+from provider_settings import LLM_Provider
 from dotenv import load_dotenv
 load_dotenv()
 
 class VisionProcessor:
     
-    def __init__(self, prompt = "", max_length=300, max_requests=3, interval=60):
+    def __init__(
+        self,
+        vision_enabled: bool,
+        primary_provider: LLM_Provider,
+        backup_providers: list[LLM_Provider],
+        max_vision_queries_per_interval: list[str],
+        vision_limit_interval: str,
+        vision_prompt: str,
+        max_output_length=300
+    ):
+        self.enabled: bool = vision_enabled
+        self.providers: list[LLM_Provider] = backup_providers
+        self.providers.insert(0, primary_provider)
         
-        self.enabled = False
-        if len(prompt) > 0:
-            self.prompt = prompt
-        else:
-            self.prompt = "Describe the image in a short but dense description. Use keywords and positional terms only. # Example: green house on hill, surrounded by dense ivy. Dark night. Single Dim lamp on left side of porch"
-            
-        self.api_key = os.environ.get("API_BOT_TOKEN")
-        self.url = os.environ.get("VISION_ENDPOINT", "https://api.fireworks.ai/inference/v1/chat/completions")
-        self.model = os.environ.get("VISION_MODEL", "accounts/fireworks/models/llama4-scout-instruct-basic")
-        self.rate_limiter = RateLimit(limit=max_requests, interval=interval)
+        self.max_vision_queries_per_interval: list[str] = max_vision_queries_per_interval
+        self.vision_limit_interval: str = vision_limit_interval
+        self.vision_prompt: str = vision_prompt
+        self.max_length = max_output_length
+        self.rate_limiter = RateLimit(limit=self.max_vision_queries_per_interval, interval=vision_limit_interval)
         
         ignored_words = [".", ",", "?", "!", ";"]
         ignored_words = sorted(ignored_words, key=len, reverse=True)
         pattern_str = '|'.join(re.escape(word) for word in ignored_words)
         self.pattern = re.compile(pattern_str, re.IGNORECASE)
-        self.max_length = max_length
         
-        print(self.url and self.model) 
-        self.enabled = self.url and self.model
     
     def is_vision_enabled(self):
         return self.enabled
@@ -48,21 +53,26 @@ class VisionProcessor:
         print(final_text)
         return final_text
     
-    async def read_image(self, image_url, model=None, timeout=20, retry=True):
+    async def read_image(self, image_url, provider_index: int=0, timeout=15):
         if not self.enabled:
             log.warning("tried reading image but image not enabled")
             return ""
+            
+        if provider_index >= len(self.providers):
+            log.error(f"(vision) tried to access provider at index ({provider_index}) but was out of range")
+            return "image failed to load"
         
-        if not model:
-            model = self.model
+        provider = self.providers[provider_index]
+        if provider_index > 0:
+            log.debug(f"retrying image generation with {provider.endpoint}, {provider.model}")
         
         try:
             payload = {
-                "model": model,
+                "model": provider.model,
                 "messages": [ {
                         "role": "user",
                         "content": [ {
-                                "type": "text", "text": self.prompt
+                                "type": "text", "text": self.vision_prompt
                             }, {
                                 "type": "image_url",
                                 "image_url": {
@@ -79,20 +89,20 @@ class VisionProcessor:
             headers = {
                 "Accept": "application/json",
                 "Content-Type": "application/json",
-                "Authorization": f"Bearer {self.api_key}"
+                "Authorization": f"Bearer {provider.api_key}"
             }
             
             
             async with aiohttp.ClientSession() as session:
-                async with session.post(self.url, json=payload, headers=headers, timeout=timeout) as response:
+                async with session.post(provider.endpoint, json=payload, headers=headers, timeout=timeout) as response:
                     response_data = await response.text()
                     
                     log.debug(response_data)
                     response_json: dict = json.loads(response_data)
                     error = response_json.get("error", None)
-                    if error and retry:
-                        log.error("failed to read image, trying again with backup model")
-                        return await self.read_image(image_url=image_url, model="accounts/fireworks/models/qwen2p5-vl-32b-instruct", retry=False)
+                    if error:
+                        log.error(f"error getting image from {provider.endpoint}: {provider.model}... {response_data}")
+                        return await self.read_image(image_url=image_url, provider_index=provider_index+1)
                     elif error:
                         log.error("failed to read image with both models")
                         return ("", 0, 0)
@@ -106,8 +116,8 @@ class VisionProcessor:
         except Exception as e:
             log.warning(f"failed to read image {e}")
             log.debug(f"image_url type: {type(image_url)}")
-            log.debug(f"key type: {type(self.api_key)}")
-            log.debug(f"prompt: {type(self.prompt)}")
-            log.debug(f"url: {type(self.url)}")
+            log.debug(f"vision_prompt: {type(self.vision_prompt)}")
+            log.debug(f"url: {type(provider.endpoint)}")
+            log.debug(f"model: {type(provider.model)}")
             return ""
         

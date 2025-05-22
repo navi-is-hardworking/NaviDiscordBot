@@ -16,11 +16,9 @@ class Parameters:
     stop: set[str]
     reminder: str = None
     
-    def __init__(self, configuration_dict: dict):
-        
-        self.prompt_manager = PromptManager()
+    def __init__(self, prompt_manager, configuration_dict: dict):
+        self.prompt_manager = prompt_manager
         self.messages = MessageQueue(configuration_dict.get('max_context_length', 3000), configuration_dict.get('min_context_length', 0))
-        
         self.model = configuration_dict.get('model', "accounts/fireworks/models/llama4-maverick-instruct-basic")
         self.max_tokens = configuration_dict.get('max_tokens', 100)
         self.temperature = configuration_dict.get('temperature', 0.6)
@@ -32,19 +30,34 @@ class Parameters:
         self.stream = configuration_dict.get('stream', False)
         self.stop = configuration_dict.get('stop', [])
         self.reminder = configuration_dict.get('reminder', None)
+        
+        log.debug(f'''configured model with
+                prompt_manager={self.prompt_manager}
+                messages={self.messages}
+                model={self.model}
+                max_tokens={self.max_tokens}
+                temperature={self.temperature}
+                top_p={self.top_p}
+                top_k={self.top_k}
+                frequency_penalty={self.frequency_penalty}
+                presence_penalty={self.presence_penalty}
+                n={self.n}
+                stream={self.stream}
+                stop={self.stop}
+                reminder={self.reminder} ''' )
     
     def set_prompt(self, prompt_manager: PromptManager):
         self.prompt_manager = prompt_manager
         
     # same without warnings... Mainly just for printing and debugging
-    def get_messages(self):
+    def get_messages(self) -> list[dict]:
         serialized_messages = []
         if self.prompt_manager.has_prompt():
             serialized_messages.append(self.prompt_manager.get_prompt())
             
         serialized_messages += self.messages.to_list()
         if (self.reminder):
-            serialized_messages.append(Message(Role.event, self.reminder).to_dict())
+            serialized_messages.append(Message(Role.user, self.reminder).to_dict())
         
         return serialized_messages
     

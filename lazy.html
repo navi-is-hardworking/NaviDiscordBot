@@ -50,28 +50,74 @@
             border-left: 4px solid #3498db;
             overflow: visible;
         }
+
         .collapsible-section {
-            cursor: pointer;
+            border: 1px solid #484848;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.4);
+            transition: background-color 0.2s ease-in-out, box-shadow 0.2s ease-in-out, border-color 0.2s ease-in-out;
             position: relative;
+            cursor: pointer;
         }
-        .collapsible-section h3 {
+        .collapsible-section:hover {
+            border-color: #6a6a6a;
+            box-shadow: 0 2px 6px rgba(0,0,0,0.5);
+            filter: brightness(115%);
+        }
+        .collapsible-section > h3,
+        .collapsible-section > h4 {
+            font-weight: 600;
+            color: #EAEAEA !important;
             display: flex;
             justify-content: space-between;
             align-items: center;
             margin: 0;
-            padding: 8px 0;
-            overflow: visible;
+            padding: 0;
         }
         .collapsible-section .toggle-icon {
-            font-size: 18px;
-            transition: transform 0.3s;
+            font-size: 1em;
+            font-weight: bold;
+            color: #3498db;
+            padding: 5px 8px;
+            border-radius: 4px;
+            background-color: rgba(52, 152, 219, 0.15);
+            transition: transform 0.25s ease-in-out, background-color 0.2s, color 0.2s;
+            line-height: 1;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            margin-left: 8px;
+        }
+        .collapsible-section:hover .toggle-icon {
+            color: #ffffff;
+            background-color: #3498db;
         }
         .collapsible-section .toggle-icon.collapsed {
             transform: rotate(-90deg);
         }
+        .sub-collapsible-section {
+            border-color: #e67e22;
+            margin-top: 15px !important;
+        }
+        .sub-collapsible-section:hover {
+            border-color: #f39c12;
+            filter: brightness(120%);
+        }
+        .sub-collapsible-section > h4 .toggle-icon {
+            color: #e67e22;
+            background-color: rgba(230, 126, 34, 0.15);
+        }
+        .sub-collapsible-section:hover > h4 .toggle-icon {
+            color: #ffffff;
+            background-color: #e67e22;
+        }
+        .collapsible-section:hover > h3,
+        .collapsible-section:hover > h4 {
+             color: #f0f0f0 !important;
+        }
+
         .collapsible-content {
             overflow: hidden;
-            max-height: 2000px; /* Adjust as needed for potentially long content */
+            max-height: 2000px;
             transition: max-height 0.3s ease-out;
         }
         .collapsible-content.collapsed {
@@ -94,12 +140,12 @@
         .form-row {
             display: flex;
             flex-wrap: wrap;
-            margin: 0 -5px; /* Gutter */
+            margin: 0 -5px;
         }
         .form-col {
-            padding: 0 5px; /* Gutter */
+            padding: 0 5px;
             flex: 1;
-            min-width: 180px; /* Adjust for P/E/M dropdowns */
+            min-width: 180px;
             margin-bottom: 10px;
         }
         label {
@@ -124,8 +170,7 @@
             background-color: #333;
             color: #e0e0e0;
         }
-        .number-input { /* Applied to number inputs by JS */
-            /* width: 80px; */ /* Can be overridden by form-col flex behavior */
+        .number-input {
         }
         textarea {
             min-height: 80px;
@@ -136,7 +181,7 @@
         textarea.large { min-height: 150px; }
         textarea.medium { min-height: 80px; }
         button {
-            background-color: #277cb4; /* Standard blue */
+            background-color: #277cb4;
             color: white;
             border: none;
             padding: 8px 12px;
@@ -150,10 +195,7 @@
         }
         button.delete-btn { background-color: #e74c3c; }
         button.delete-btn:hover { background-color: #c0392b; }
-        /* Save button style if re-enabled
-        button.save-btn { background-color: #199c4d; }
-        button.save-btn:hover { background-color: #11743a; }
-        */
+
         .dictionary-entry {
             display: flex;
             margin-bottom: 8px;
@@ -163,32 +205,32 @@
         .dictionary-value { flex: 2; }
         .dictionary-actions { display: flex; align-items: center; }
 
-        .array-entry { /* Styling for array items, especially complex ones */
+        .array-entry {
             display: flex;
-            flex-wrap: wrap; /* Allow P/E/M dropdowns to wrap if needed */
+            flex-wrap: wrap;
             margin-bottom: 8px;
             gap: 8px;
-            align-items: flex-end; /* Align button nicely with inputs */
+            align-items: flex-end;
         }
-        .array-entry.section { /* For backup model entries that are grouped */
+        .array-entry.section {
             border: 1px solid #4a4a4a; padding: 10px; border-radius: 4px;
         }
-        .array-entry input, .array-entry select { /* Ensure inputs/selects in array items also grow */
+        .array-entry input, .array-entry select {
             flex: 1;
-            min-width: 120px; /* Minimum width for dropdowns in an array item */
+            min-width: 120px;
         }
 
-        .remove-entry { /* Shared by dictionary and array removal buttons */
+        .remove-entry {
             background-color: #e74c3c; color: white; border: none;
             width: 24px; height: 24px; border-radius: 50%; cursor: pointer;
             display: flex; align-items: center; justify-content: center;
             font-weight: bold; padding: 0; font-size: 12px;
-            margin-left: 5px; /* Add some space */
+            margin-left: 5px;
         }
-        .remove-entry.delete-btn { /* For array item removal text button */
+        .remove-entry.delete-btn {
             width: auto; height: auto; border-radius: 4px; padding: 4px 8px;
         }
-        .add-entry { /* Shared by dictionary and array add buttons */
+        .add-entry {
             background-color: #199c4d; margin-top: 6px; font-size: 12px; padding: 4px 8px;
         }
 
@@ -199,7 +241,7 @@
         .notification {
             position: fixed; top: 20px; right: 20px; padding: 12px;
             border-radius: 5px; color: white; display: none;
-            font-size: 14px; z-index: 10000; /* High z-index */
+            font-size: 14px; z-index: 10000;
         }
         .success { background-color: #199c4d; }
         .error { background-color: #e74c3c; }
@@ -223,8 +265,8 @@
 
         .tabs {
             display: flex; border-bottom: 1px solid #444; margin-bottom: 20px;
-            overflow-x: auto; /* Allow horizontal scroll for many tabs */
-            white-space: nowrap; /* Keep tabs on one line */
+            overflow-x: auto;
+            white-space: nowrap;
         }
         .tab {
             padding: 10px 15px; cursor: pointer; transition: background-color 0.3s;
@@ -235,8 +277,7 @@
         .tab:hover { background-color: #383838; }
         .tab.active {
             background-color: #3498db; border-color: #3498db;
-            border-bottom: 1px solid #3498db; /* For visual integration */
-            /* margin-bottom: -1px; */ /* Can cause layout shifts, be careful */
+            border-bottom: 1px solid #3498db;
             font-weight: bold; color: #ffffff;
         }
         .tab.disabled { background-color: #222; color: #777; border: 1px dashed #444; }
@@ -251,13 +292,12 @@
             display: flex; align-items: center; padding: 8px 12px;
             background-color: #199c4d; margin-left: 10px; font-size: 12px;
         }
-        .add-bot-button i { margin-right: 5px; font-style: normal; } /* For '+' sign */
+        .add-bot-button i { margin-right: 5px; font-style: normal; }
 
-        /* Debug panel styles (if used) */
         .debug-panel {
             margin-top: 20px; padding: 10px; background-color: #2a2a2a;
             border-radius: 5px; font-family: monospace; font-size: 12px;
-            display: none; /* Initially hidden */ color: #ccc;
+            display: none; color: #ccc;
         }
         .debug-panel h3 { margin-top: 0; font-size: 14px; color: #3498db; }
         .debug-panel pre {
@@ -265,8 +305,7 @@
             padding: 8px; border: 1px solid #444; color: #d0d0d0;
         }
 
-        /* Bot Start/Stop Control Button Styles */
-        .bot-control-btn { /* Base for start/stop */
+        .bot-control-btn {
             display: flex; align-items: center;
             padding: 8px 12px; font-size: 14px;
         }
@@ -281,15 +320,14 @@
         }
         .status-running { background-color: #27ae60; box-shadow: 0 0 6px #27ae60; }
         .status-stopped { background-color: #e74c3c; box-shadow: 0 0 6px #e74c3c; }
-        .status-unknown { background-color: #7f8c8d; } /* For initial or error state */
+        .status-unknown { background-color: #7f8c8d; }
 
-        /* Bot Status Toggle (Enabled/Disabled Switch) */
-        .bot-status-toggle { /* Container for the switch and label */
+        .bot-status-toggle {
             display: flex; align-items: center; padding: 12px;
             background-color: #2d2d2d; border-radius: 5px;
             border-left: 4px solid #3498db; margin-bottom: 20px;
         }
-        .bot-status-toggle label { /* Label next to the switch */
+        .bot-status-toggle label {
             cursor: pointer; font-size: 16px; font-weight: bold; color: #e0e0e0;
             margin-left: 10px; margin-bottom: 0; background: none; border: none; box-shadow: none; padding: 0;
         }
@@ -309,10 +347,9 @@
         input:checked + .slider:before { transform: translateX(30px); }
         .status-text { font-size: 14px; color: #999; margin-left: 5px; }
         .status-text.status-enabled { color: #27ae60; }
-        .status-text.status-disabled { color: #c0392b; } /* More prominent disabled color */
+        .status-text.status-disabled { color: #c0392b; }
 
 
-        /* Tooltip Styles */
         .tooltip { position: relative; display: inline-block; margin-left: 6px; cursor: help; }
         .tooltip-icon {
             display: inline-flex; align-items: center; justify-content: center;
@@ -329,17 +366,16 @@
         }
         .tooltip:hover .tooltip-text { visibility: visible; opacity: 1; }
 
-        /* Input Validation Styles */
         .invalid-input {
             border: 1px solid #e74c3c !important;
             background-color: rgba(231, 76, 60, 0.05) !important;
         }
         .validation-message { color: #e74c3c; font-size: 11px; margin-top: 3px; }
 
-        .label-container { /* To group label and tooltip */
+        .label-container {
             display: flex; align-items: center; margin-bottom: 6px;
         }
-        .label-container label { margin-bottom: 0; } /* Remove bottom margin if it's inside label-container */
+        .label-container label { margin-bottom: 0; }
 
     </style>
 </head>
@@ -373,5 +409,5 @@
         </div>
     </div>
 
-    <script src="lazy_loader.js?v=5"></script>
+    <script src="lazy_loader.js?v=8"></script>
 </html>

@@ -1,13 +1,12 @@
 import signal
 import sys
-import atexit
 import asyncio
-from discord_llama import discord_llama
-from prompt_manager import PromptManager
 from discord_bot import DiscordBot
-from vision_processor import VisionProcessor
 import config_parser
 from logger import log
+from llm_setup import create_llm
+
+import sys; sys.stderr.write("BOT SCRIPT STARTED\n"); sys.stderr.flush()
 
 def signal_handler(sig, frame):
     log.debug("Received termination signal. Shutting down gracefully...")
@@ -29,41 +28,18 @@ if __name__ == "__main__":
     log.debug(settings_file_path)
     
     bots: list[DiscordBot] = []
+    log.debug(f"reading settings from {settings_file_path}")
     for char_name, settings in config_parser.parse_json(settings_file_path).items():
-        
         if not settings["enabled"]:
             continue
         
+        chat = create_llm(char_name=char_name, settings=settings)
+        
         bot_token_location = settings["bot_token"]
-        chat = discord_llama()
-        
-        (
-            prompt_tail,
-            prompt_head,
-            cache_header,
-            definition_dictionary
-        ) =  settings['prompt_settings']['prompt_head'], settings['prompt_settings']['prompt_tail'], settings['prompt_settings']['cache_header'], settings['prompt_settings']['dictionary_cache']
-        
-        pm = PromptManager()
-        pm.configure(
-            prompt_tail,
-            prompt_head,
-            cache_header,
-            definition_dictionary,
-            settings['prompt_settings']['cache_capacity'],
-            settings['prompt_settings']['cache_clear_time']
-        )
-        
         response_limits = settings['response_limits']
-        vision_client = VisionProcessor(max_requests=response_limits['max_vision_queries_per_interval'], interval=response_limits['vision_limit_interval'])
-        
-        chat.set_parameters(settings['llm_settings'])
-        chat.set_prompt_manager(pm)
-        chat.set_vision_client(vision_client=vision_client)
-        
-        
-        discord_bot = DiscordBot(char_name, bot_token_location, response_limits, chat)
+        discord_bot = DiscordBot(bot_name=char_name, bot_token_location=bot_token_location, setting_dictionary=response_limits, chat=chat)
         bots.append(discord_bot)
+        log.debug(f"initialized {char_name}")
     
     try:
         asyncio.run(run_bots(bots))

@@ -24,7 +24,7 @@ const visionOptions = {
 const modelOptions = {
     "TogetherAI": {
         "https://api.together.xyz/v1/chat/completions": {
-            "Llama 70B Free": "meta-llama/Llama-3.3-70B-Instruct-Turbo-Free",
+            "Llama-3.3 70B Free": "meta-llama/Llama-3.3-70B-Instruct-Turbo-Free",
             "Llama-Vision-Free": "meta-llama/Llama-Vision-Free",
             "Deepseek Free": "deepseek-ai/DeepSeek-R1-Distill-Llama-70B-free",
             "Llama-3.3 70B": "meta-llama/Llama-3.3-70B-Instruct-Turbo",
@@ -49,9 +49,6 @@ let settingsSchema = {
     _global: {
         enabled: { type: 'boolean', tooltip: 'Enable or disable this bot' },
         bot_token: { type: 'text', tooltip: 'Discord Bot Token (Stored in .env based on Bot Name)' },
-        llm_provider: { type: 'text', hidden: true },
-        llm_endpoint: { type: 'text', hidden: true },
-        llm_model: { type: 'text', hidden: true },
         prompt_settings: {
             prompt_head: { type: 'text', multiline: true, tooltip: 'The main part of the prompt. Add style guidelines and Character definition here.' },
             dictionary_cache_header: { type: 'text', multiline: true, tooltip: '(Optional) Header text for the dictionary_cache section. Tell the bot what the dictionary_cache means. ie. # Memories, # Notes:, # Response examples... etc...' },
@@ -61,11 +58,15 @@ let settingsSchema = {
             prompt_tail: { type: 'text', multiline: true, tooltip: '(Optional) Final note for the model. Example: You are chatting in a discord server' },
         },
         llm_settings: {
+            provider: { type: 'text', hidden: true },
+            endpoint: { type: 'text', hidden: true },
+            model: { type: 'text', hidden: true },
             backup_models: {
                 type: 'array',
                 tooltip: 'List of backup LLM models to try if the primary fails. Ordered by preference.',
                 itemSchema: {
                     provider: { type: 'select', options: Object.keys(modelOptions), tooltip: "Provider for this backup LLM." },
+                    endpoint: { type: 'text', hidden: true },
                     model: { type: 'select', options: {}, tooltip: "Model for this backup LLM (populates based on provider)." }
                 }
             },
@@ -83,14 +84,16 @@ let settingsSchema = {
         },
         vision_settings: {
             vision_enabled: { type: 'boolean', tooltip: 'Enable or disable vision for this bot.' },
-            vision_provider: { type: 'text', hidden: true },
-            vision_endpoint: { type: 'text', hidden: true },
-            vision_model: { type: 'text', hidden: true },
-            backup_vision_models: {
+            vision_prompt: { type: 'text', multiline: true, tooltip: 'System prompt for vision requests. Define how the vision model should interpret images.' },
+            provider: { type: 'text', hidden: true },
+            endpoint: { type: 'text', hidden: true },
+            model: { type: 'text', hidden: true },
+            backup_models: {
                 type: 'array',
                 tooltip: 'List of backup vision models.',
                 itemSchema: {
                     provider: { type: 'select', options: Object.keys(visionOptions), tooltip: "Provider for backup vision model." },
+                    endpoint: { type: 'text', hidden: true },
                     model: { type: 'select', options: {}, tooltip: "Backup vision model." }
                 }
             },
@@ -105,6 +108,7 @@ let settingsSchema = {
             monitored_channels: { type: 'array', itemType: 'text', tooltip: 'Channel IDs bot reads/writes to.' },
             partial_ignore_list: { type: 'array', itemType: 'text', tooltip: 'User/bot IDs bot reads but won\'t trigger response.' },
             full_ignore_list: { type: 'array', itemType: 'text', tooltip: 'IDs bot ignores completely.' },
+            admins: { type: 'array', itemType: 'text', tooltip: 'User IDs that are administrators for this bot.' },
             typing_delay_range: { type: 'range', min: 0, max: 60, tooltip: 'Typing effect delay range (seconds).' },
             random_occurences_enabled: { type: 'boolean', tooltip: 'Bot can randomly respond in monitored channels.' },
         }
@@ -128,7 +132,6 @@ function getFirstProviderAndModelDetails(isVision = false) {
             }
         }
     }
-
     const fallbackOptions = isVision ? visionOptions : modelOptions;
     const firstProvider = Object.keys(fallbackOptions)[0];
     if (!firstProvider) return { provider: null, endpoint: null, model: null };
@@ -161,18 +164,17 @@ if (!defaultVisionSelections.provider && Object.keys(visionOptions).length === 0
     }
 }
 
-
 const defaultSettings = {
     enabled: true,
     bot_token: "YOUR_BOT_NAME_BOT_TOKEN",
-    llm_provider: defaultLLMSelections.provider,
-    llm_endpoint: defaultLLMSelections.endpoint,
-    llm_model: defaultLLMSelections.model,
     prompt_settings: {
         prompt_head: "", prompt_tail: "", dictionary_cache_header: "", dictionary_cache: {},
         cache_capacity: 3, cache_clear_time: 300
     },
     llm_settings: {
+        provider: defaultLLMSelections.provider,
+        endpoint: defaultLLMSelections.endpoint,
+        model: defaultLLMSelections.model,
         backup_models: [],
         max_context_length: 3000, min_context_length: 0, max_tokens: 100,
         temperature: 0.7, top_p: 1, top_k: 50, frequency_penalty: 1, presence_penalty: 0,
@@ -180,17 +182,18 @@ const defaultSettings = {
     },
     vision_settings: {
         vision_enabled: false,
-        vision_provider: defaultVisionSelections.provider,
-        vision_endpoint: defaultVisionSelections.endpoint,
-        vision_model: defaultVisionSelections.model,
-        backup_vision_models: [],
+        vision_prompt: "Describe the image in a short but dense description. Use keywords and positional terms only. # Example: green house on hill, surrounded by dense ivy. Dark night. Single Dim lamp on left side of porch",
+        provider: defaultVisionSelections.provider,
+        endpoint: defaultVisionSelections.endpoint,
+        model: defaultVisionSelections.model,
+        backup_models: [],
         max_vision_queries_per_interval: 4,
         vision_limit_interval: 120,
     },
     response_limits: {
         max_user_input_message_length: 300, response_limit_interval: 240,
         max_bot_response_count_per_interval: 20, chat_clear_time: 900,
-        monitored_channels: [], partial_ignore_list: [], full_ignore_list: [],
+        monitored_channels: [], admins: [], partial_ignore_list: [], full_ignore_list: [],
         typing_delay_range: [1, 12], random_occurences_enabled: false
     }
 };
@@ -216,33 +219,95 @@ function ensureSettingsExist(modelName) {
         botData.bot_token = botData.bot_token.substring(4);
     }
 
+    if (typeof botData.prompt_settings !== 'object' || botData.prompt_settings === null) {
+        botData.prompt_settings = JSON.parse(JSON.stringify(defaultSettings.prompt_settings));
+    }
+    if (botData.prompt_settings.hasOwnProperty('dictionary')) {
+        if (!botData.prompt_settings.hasOwnProperty('dictionary_cache')) {
+            botData.prompt_settings.dictionary_cache = botData.prompt_settings.dictionary;
+        }
+        delete botData.prompt_settings.dictionary;
+    }
+    if (botData.prompt_settings.hasOwnProperty('dictionary_header')) {
+        if (!botData.prompt_settings.hasOwnProperty('dictionary_cache_header')) {
+            botData.prompt_settings.dictionary_cache_header = botData.prompt_settings.dictionary_header;
+        }
+        delete botData.prompt_settings.dictionary_header;
+    }
+    if (typeof botData.prompt_settings.dictionary_cache !== 'object' || botData.prompt_settings.dictionary_cache === null) {
+        botData.prompt_settings.dictionary_cache = defaultSettings.prompt_settings.dictionary_cache !== undefined
+            ? JSON.parse(JSON.stringify(defaultSettings.prompt_settings.dictionary_cache))
+            : {};
+    }
+    if (typeof botData.prompt_settings.dictionary_cache_header !== 'string') {
+        botData.prompt_settings.dictionary_cache_header = defaultSettings.prompt_settings.dictionary_cache_header !== undefined
+            ? defaultSettings.prompt_settings.dictionary_cache_header
+            : "";
+    }
+
     if (typeof botData.llm_settings !== 'object' || botData.llm_settings === null) {
         botData.llm_settings = JSON.parse(JSON.stringify(defaultSettings.llm_settings));
     }
-    if (botData.llm_settings && typeof botData.llm_settings.model === 'string' && botData.llm_provider === undefined) {
+
+    let llmTempProvider = botData.llm_settings.provider;
+    let llmTempEndpoint = botData.llm_settings.endpoint;
+    let llmTempModel = botData.llm_settings.model;
+
+    if (botData.llm_settings.hasOwnProperty('llm_provider')) {
+        if (llmTempProvider === undefined) llmTempProvider = botData.llm_settings.llm_provider;
+        delete botData.llm_settings.llm_provider;
+    }
+    if (botData.llm_settings.hasOwnProperty('llm_endpoint')) {
+        if (llmTempEndpoint === undefined) llmTempEndpoint = botData.llm_settings.llm_endpoint;
+        delete botData.llm_settings.llm_endpoint;
+    }
+    if (botData.llm_settings.hasOwnProperty('llm_model')) {
+        if (llmTempModel === undefined) llmTempModel = botData.llm_settings.llm_model;
+        delete botData.llm_settings.llm_model;
+    }
+
+    if (botData.hasOwnProperty('llm_provider')) {
+        if (llmTempProvider === undefined) llmTempProvider = botData.llm_provider;
+        delete botData.llm_provider;
+    }
+    if (botData.hasOwnProperty('llm_endpoint')) {
+        if (llmTempEndpoint === undefined) llmTempEndpoint = botData.llm_endpoint;
+        delete botData.llm_endpoint;
+    }
+    if (botData.hasOwnProperty('llm_model')) {
+        if (llmTempModel === undefined) llmTempModel = botData.llm_model;
+        delete botData.llm_model;
+    }
+
+    botData.llm_settings.provider = llmTempProvider;
+    botData.llm_settings.endpoint = llmTempEndpoint;
+    botData.llm_settings.model = llmTempModel;
+
+    if (typeof botData.llm_settings.model === 'string' && botData.llm_settings.provider === undefined) {
         const oldModelIdOrName = botData.llm_settings.model;
         let migrated = false;
         for (const pName in modelOptions) {
             for (const epUrl in modelOptions[pName]) {
-                if (Object.values(modelOptions[pName][epUrl]).includes(oldModelIdOrName)) {
-                    botData.llm_provider = pName; botData.llm_endpoint = epUrl; botData.llm_model = oldModelIdOrName; migrated = true; break;
+                const modelsAtEndpoint = modelOptions[pName][epUrl];
+                if (Object.values(modelsAtEndpoint).includes(oldModelIdOrName)) {
+                    botData.llm_settings.provider = pName; botData.llm_settings.endpoint = epUrl; botData.llm_settings.model = oldModelIdOrName; migrated = true; break;
                 }
-                if (modelOptions[pName][epUrl][oldModelIdOrName]) {
-                    botData.llm_provider = pName; botData.llm_endpoint = epUrl; botData.llm_model = modelOptions[pName][epUrl][oldModelIdOrName]; migrated = true; break;
+                if (modelsAtEndpoint[oldModelIdOrName]) {
+                    botData.llm_settings.provider = pName; botData.llm_settings.endpoint = epUrl; botData.llm_settings.model = modelsAtEndpoint[oldModelIdOrName]; migrated = true; break;
                 }
             }
             if (migrated) break;
         }
         if (!migrated) {
-            botData.llm_provider = defaultSettings.llm_provider;
-            botData.llm_endpoint = defaultSettings.llm_endpoint;
-            botData.llm_model = defaultSettings.llm_model;
+            botData.llm_settings.provider = defaultSettings.llm_settings.provider;
+            botData.llm_settings.endpoint = defaultSettings.llm_settings.endpoint;
+            botData.llm_settings.model = defaultSettings.llm_settings.model;
         }
     }
-    if (botData.llm_provider === undefined) botData.llm_provider = defaultSettings.llm_provider;
-    if (botData.llm_endpoint === undefined) botData.llm_endpoint = defaultSettings.llm_endpoint;
-    if (botData.llm_model === undefined) botData.llm_model = defaultSettings.llm_model;
 
+    if (botData.llm_settings.provider === undefined) botData.llm_settings.provider = defaultSettings.llm_settings.provider;
+    if (botData.llm_settings.endpoint === undefined) botData.llm_settings.endpoint = defaultSettings.llm_settings.endpoint;
+    if (botData.llm_settings.model === undefined) botData.llm_settings.model = defaultSettings.llm_settings.model;
 
     if (botData.response_limits && botData.response_limits.vision_enabled !== undefined) {
         if (typeof botData.vision_settings !== 'object' || botData.vision_settings === null) {
@@ -251,47 +316,80 @@ function ensureSettingsExist(modelName) {
         botData.vision_settings.vision_enabled = botData.response_limits.vision_enabled;
         delete botData.response_limits.vision_enabled;
     }
+
     if (typeof botData.vision_settings !== 'object' || botData.vision_settings === null) {
         botData.vision_settings = JSON.parse(JSON.stringify(defaultSettings.vision_settings));
+    } else {
+        if (botData.vision_settings.hasOwnProperty('vision_models') && !botData.vision_settings.hasOwnProperty('backup_models')) {
+            botData.vision_settings.backup_models = botData.vision_settings.vision_models;
+            delete botData.vision_settings.vision_models;
+        }
     }
-    if (botData.vision_settings && typeof botData.vision_settings.vision_model === 'string' && botData.vision_settings.vision_provider === undefined) {
-        const oldVisionModelIdOrName = botData.vision_settings.vision_model;
+     if (botData.vision_settings.backup_models === undefined) {
+        botData.vision_settings.backup_models = JSON.parse(JSON.stringify(defaultSettings.vision_settings.backup_models || []));
+    } else if (!Array.isArray(botData.vision_settings.backup_models)) {
+        botData.vision_settings.backup_models = JSON.parse(JSON.stringify(defaultSettings.vision_settings.backup_models || []));
+    }
+
+    let visionTempProvider = botData.vision_settings.provider;
+    let visionTempEndpoint = botData.vision_settings.endpoint;
+    let visionTempModel = botData.vision_settings.model;
+
+    if (botData.vision_settings.hasOwnProperty('vision_provider')) {
+        if (visionTempProvider === undefined) visionTempProvider = botData.vision_settings.vision_provider;
+        delete botData.vision_settings.vision_provider;
+    }
+    if (botData.vision_settings.hasOwnProperty('vision_endpoint')) {
+        if (visionTempEndpoint === undefined) visionTempEndpoint = botData.vision_settings.vision_endpoint;
+        delete botData.vision_settings.vision_endpoint;
+    }
+    if (botData.vision_settings.hasOwnProperty('vision_model')) {
+        if (visionTempModel === undefined) visionTempModel = botData.vision_settings.vision_model;
+        delete botData.vision_settings.vision_model;
+    }
+
+    botData.vision_settings.provider = visionTempProvider;
+    botData.vision_settings.endpoint = visionTempEndpoint;
+    botData.vision_settings.model = visionTempModel;
+
+    if (botData.vision_settings && typeof botData.vision_settings.model === 'string' && botData.vision_settings.provider === undefined) {
+        const oldVisionModelIdOrName = botData.vision_settings.model;
         let migratedVision = false;
         for (const pName in visionOptions) {
             for (const epUrl in visionOptions[pName]) {
-                if (Object.values(visionOptions[pName][epUrl]).includes(oldVisionModelIdOrName)) {
-                    botData.vision_settings.vision_provider = pName; botData.vision_settings.vision_endpoint = epUrl; botData.vision_settings.vision_model = oldVisionModelIdOrName; migratedVision = true; break;
+                const modelsAtEndpoint = visionOptions[pName][epUrl];
+                if (Object.values(modelsAtEndpoint).includes(oldVisionModelIdOrName)) {
+                    botData.vision_settings.provider = pName; botData.vision_settings.endpoint = epUrl; botData.vision_settings.model = oldVisionModelIdOrName; migratedVision = true; break;
                 }
-                if (visionOptions[pName][epUrl][oldVisionModelIdOrName]) {
-                    botData.vision_settings.vision_provider = pName; botData.vision_settings.vision_endpoint = epUrl; botData.vision_settings.vision_model = visionOptions[pName][epUrl][oldVisionModelIdOrName]; migratedVision = true; break;
+                if (modelsAtEndpoint[oldVisionModelIdOrName]) {
+                    botData.vision_settings.provider = pName; botData.vision_settings.endpoint = epUrl; botData.vision_settings.model = modelsAtEndpoint[oldVisionModelIdOrName]; migratedVision = true; break;
                 }
             }
             if (migratedVision) break;
         }
         if (!migratedVision) {
-            botData.vision_settings.vision_provider = defaultSettings.vision_settings.vision_provider;
-            botData.vision_settings.vision_endpoint = defaultSettings.vision_settings.vision_endpoint;
-            botData.vision_settings.vision_model = defaultSettings.vision_settings.vision_model;
+            botData.vision_settings.provider = defaultSettings.vision_settings.provider;
+            botData.vision_settings.endpoint = defaultSettings.vision_settings.endpoint;
+            botData.vision_settings.model = defaultSettings.vision_settings.model;
         }
     }
-    
+
     const visionDefaults = defaultSettings.vision_settings || {};
     for (const key in visionDefaults) {
         if (botData.vision_settings[key] === undefined) {
             botData.vision_settings[key] = JSON.parse(JSON.stringify(visionDefaults[key]));
         }
     }
-    if (botData.vision_settings.vision_enabled && botData.vision_settings.vision_provider === undefined) {
+    if (botData.vision_settings.vision_enabled && botData.vision_settings.provider === undefined) {
         const inferredVision = getFirstProviderAndModelDetails(true);
-        botData.vision_settings.vision_provider = inferredVision.provider ?? defaultSettings.vision_settings.vision_provider;
-        botData.vision_settings.vision_endpoint = inferredVision.endpoint ?? defaultSettings.vision_settings.vision_endpoint;
-        botData.vision_settings.vision_model = inferredVision.model ?? defaultSettings.vision_settings.vision_model;
+        botData.vision_settings.provider = inferredVision.provider ?? defaultSettings.vision_settings.provider;
+        botData.vision_settings.endpoint = inferredVision.endpoint ?? defaultSettings.vision_settings.endpoint;
+        botData.vision_settings.model = inferredVision.model ?? defaultSettings.vision_settings.model;
     }
-
 
     const defaultCategories = Object.keys(defaultSettings);
     for (const category of defaultCategories) {
-        if (category === 'enabled' || category === 'bot_token' || category === 'llm_provider' || category === 'llm_endpoint' || category === 'llm_model' || category === 'vision_settings') {
+        if (category === 'enabled' || category === 'bot_token') {
             continue;
         }
         if (typeof defaultSettings[category] === 'object' && defaultSettings[category] !== null) {
@@ -299,6 +397,13 @@ function ensureSettingsExist(modelName) {
                 botData[category] = JSON.parse(JSON.stringify(defaultSettings[category]));
             } else {
                 for (const key in defaultSettings[category]) {
+                    if ( (category === 'llm_settings' || category === 'vision_settings') &&
+                         (key === 'provider' || key === 'endpoint' || key === 'model') ) {
+                        if (botData[category][key] === undefined) {
+                                botData[category][key] = JSON.parse(JSON.stringify(defaultSettings[category][key]));
+                        }
+                        continue;
+                    }
                     if (botData[category][key] === undefined) {
                         botData[category][key] = JSON.parse(JSON.stringify(defaultSettings[category][key]));
                     }
@@ -316,8 +421,8 @@ function ensureSettingsExist(modelName) {
 
     const arrayFieldsPaths = [
         "llm_settings.backup_models", "llm_settings.stop",
-        "vision_settings.backup_vision_models",
-        "response_limits.monitored_channels", "response_limits.partial_ignore_list", "response_limits.full_ignore_list"
+        "vision_settings.backup_models",
+        "response_limits.monitored_channels", "response_limits.admins", "response_limits.partial_ignore_list", "response_limits.full_ignore_list"
     ];
     for (const path of arrayFieldsPaths) {
         const parts = path.split('.');
@@ -334,18 +439,17 @@ function ensureSettingsExist(modelName) {
         botData.prompt_settings.dictionary_cache = {};
     }
 
-
     const allKnownKeys = new Set(Object.keys(defaultSettings));
     Object.keys(settingsSchema._global).forEach(k => allKnownKeys.add(k));
-    allKnownKeys.add('llm_provider'); allKnownKeys.add('llm_endpoint'); allKnownKeys.add('llm_model');
 
     for (const key in botData) {
         if (!allKnownKeys.has(key)) {
-            delete botData[key];
+            if (!defaultSettings.hasOwnProperty(key) && !settingsSchema._global.hasOwnProperty(key)) {
+            }
         } else if (typeof defaultSettings[key] === 'object' && defaultSettings[key] !== null && typeof botData[key] === 'object' && botData[key] !== null) {
             const defaultCategoryKeys = new Set(Object.keys(defaultSettings[key]));
             if (settingsSchema._global[key]) {
-                 Object.keys(settingsSchema._global[key]).forEach(sk => defaultCategoryKeys.add(sk));
+                    Object.keys(settingsSchema._global[key]).forEach(sk => defaultCategoryKeys.add(sk));
             }
             for (const subKey in botData[key]) {
                 if (!defaultCategoryKeys.has(subKey)) {
@@ -355,7 +459,6 @@ function ensureSettingsExist(modelName) {
         }
     }
 }
-
 
 async function updateBotToken(modelName, tokenValue) {
     const tokenKeyForEnv = `${modelName.toUpperCase().replace(/[^A-Z0-9_]/g, '_')}_BOT_TOKEN`;
@@ -408,8 +511,10 @@ function renderModelContent(modelName) {
     };
     modelSection.appendChild(botStatusToggle);
 
-    const topConfigSection = document.createElement('div'); topConfigSection.className = 'section'; topConfigSection.style.marginBottom = '20px';
-    topConfigSection.innerHTML = '<h2>Bot & Primary LLM Configuration</h2>';
+    const topConfigSection = document.createElement('div');
+    topConfigSection.className = 'section';
+    topConfigSection.style.marginBottom = '20px';
+    topConfigSection.innerHTML = '<h2>Bot & API Key Configuration</h2>';
 
     const tokenAndApiKeysRow = document.createElement('div');
     tokenAndApiKeysRow.className = 'form-row';
@@ -431,22 +536,18 @@ function renderModelContent(modelName) {
     for (const providerName in allProviders) {
         const apiKeyEnvVar = getApiKeyEnvName(providerName);
         if (!apiKeyEnvVar) continue;
-
         const apiKeyCol = document.createElement('div');
         apiKeyCol.className = 'form-col';
         const keyGroup = document.createElement('div');
         keyGroup.className = 'form-group';
-
         const label = document.createElement('label');
         label.textContent = `${providerName} API Key`;
         label.htmlFor = `${modelName}-${providerName}-global-apikey`;
-
         const envVarDisplay = document.createElement('span');
         envVarDisplay.textContent = ` (${apiKeyEnvVar})`;
         envVarDisplay.style.fontSize = '0.8em';
         envVarDisplay.style.marginLeft = '5px';
         label.appendChild(envVarDisplay);
-
         const input = document.createElement('input');
         input.type = 'password';
         input.id = `${modelName}-${providerName}-global-apikey`;
@@ -456,80 +557,189 @@ function renderModelContent(modelName) {
             if (this.value.trim() === '') return;
             await updateProviderApiToken(this.dataset.provider, this.value, this);
         };
-
         keyGroup.appendChild(label);
         keyGroup.appendChild(input);
         apiKeyCol.appendChild(keyGroup);
         tokenAndApiKeysRow.appendChild(apiKeyCol);
     }
     topConfigSection.appendChild(tokenAndApiKeysRow);
-
-    const llmSelectorsRow = document.createElement('div');
-    llmSelectorsRow.className = 'form-row';
-    createProviderModelSelectors(modelName, 'primary_llm', modelData, llmSelectorsRow, false);
-    topConfigSection.appendChild(llmSelectorsRow);
-
-    const llmBackupSchema = settingsSchema._global.llm_settings.backup_models;
-    if (llmBackupSchema) {
-        const backupTitle = document.createElement('h4'); backupTitle.textContent = "LLM Backup Models"; backupTitle.style.marginTop = "20px";
-        topConfigSection.appendChild(backupTitle);
-        const backupFormGroup = document.createElement('div'); backupFormGroup.className = 'form-group';
-        backupFormGroup.appendChild(createArrayInput(modelName, 'llm_settings', 'backup_models', modelData.llm_settings.backup_models || [], llmBackupSchema));
-        topConfigSection.appendChild(backupFormGroup);
-    }
     modelSection.appendChild(topConfigSection);
 
     const categoryRenderOrder = Object.keys(settingsSchema._global).filter(key =>
-        key !== 'enabled' && key !== 'bot_token' &&
-        key !== 'llm_provider' && key !== 'llm_endpoint' && key !== 'llm_model' &&
-        key !== 'vision_provider' && key !== 'vision_endpoint' && key !== 'vision_model'
+        key !== 'enabled' && key !== 'bot_token'
     );
 
     for (const category of categoryRenderOrder) {
-        const categorySchema = settingsSchema._global[category]; const categoryData = modelData[category] || {};
-        const categorySectionDiv = document.createElement('div'); categorySectionDiv.className = 'section';
-        const headerDiv = document.createElement('div'); headerDiv.className = 'collapsible-section';
-        const headerTitle = document.createElement('h3'); headerTitle.innerHTML = `${formatCategoryName(category)} <span class="toggle-icon">▼</span>`;
-        headerDiv.appendChild(headerTitle); categorySectionDiv.appendChild(headerDiv);
-        const contentDiv = document.createElement('div'); contentDiv.className = 'collapsible-content';
-        const sectionKey = `${modelName}-${category}`;
+        const categorySchema = settingsSchema._global[category];
+        const categoryData = modelData[category] || {};
 
-        if (collapsedSections[sectionKey] === undefined) collapsedSections[sectionKey] = true;
-        if (collapsedSections[sectionKey] === true) {
-            headerTitle.querySelector('.toggle-icon').classList.add('collapsed'); contentDiv.classList.add('collapsed');
+        const categorySectionDiv = document.createElement('div');
+        categorySectionDiv.className = 'section';
+
+        const headerDiv = document.createElement('div');
+        headerDiv.className = 'collapsible-section';
+        headerDiv.style.backgroundColor = '#222222';
+        headerDiv.style.color = '#E0E0E0';
+        headerDiv.style.padding = '8px 10px';
+        headerDiv.style.borderRadius = '3px';
+        headerDiv.style.marginBottom = '10px';
+        headerDiv.style.cursor = 'pointer';
+
+        const headerTitle = document.createElement('h3');
+        headerTitle.style.margin = '0';
+        headerTitle.style.padding = '0';
+        headerTitle.style.color = 'inherit';
+        headerTitle.style.display = 'flex';
+        headerTitle.style.justifyContent = 'space-between';
+        headerTitle.style.alignItems = 'center';
+        headerTitle.innerHTML = `${formatCategoryName(category)} <span class="toggle-icon" style="color: inherit;">▼</span>`;
+        headerDiv.appendChild(headerTitle);
+
+        const contentDiv = document.createElement('div');
+        contentDiv.className = 'collapsible-content';
+
+        categorySectionDiv.appendChild(headerDiv);
+        categorySectionDiv.appendChild(contentDiv);
+        modelSection.appendChild(categorySectionDiv);
+
+        const sectionKey = `${modelName}-${category}`;
+        const mainSectionIcon = headerTitle.querySelector('.toggle-icon');
+
+        if (collapsedSections[sectionKey] === undefined) {
+            collapsedSections[sectionKey] = true;
         }
 
+        const isCurrentlyCollapsed = collapsedSections[sectionKey] === true;
+        if(mainSectionIcon) mainSectionIcon.classList.toggle('collapsed', isCurrentlyCollapsed);
+        contentDiv.classList.toggle('collapsed', isCurrentlyCollapsed);
+
         headerDiv.onclick = function() {
-            contentDiv.classList.toggle('collapsed'); headerTitle.querySelector('.toggle-icon').classList.toggle('collapsed');
-            collapsedSections[sectionKey] = contentDiv.classList.contains('collapsed');
+            const targetStateCollapsed = !contentDiv.classList.contains('collapsed');
+            contentDiv.classList.toggle('collapsed', targetStateCollapsed);
+            if(mainSectionIcon) mainSectionIcon.classList.toggle('collapsed', targetStateCollapsed);
+            collapsedSections[sectionKey] = targetStateCollapsed;
         };
+
         let currentFieldsInRow = 0; let currentRowElement = null;
         const fieldOrder = Object.keys(categorySchema);
+
+        if (category === 'llm_settings') {
+            const primaryLLMTitle = document.createElement('h4'); primaryLLMTitle.textContent = "Primary LLM Configuration"; primaryLLMTitle.style.marginTop = "0px"; primaryLLMTitle.style.marginBottom = "10px";
+            contentDiv.appendChild(primaryLLMTitle);
+
+            const llmSelectorsContainer = document.createElement('div'); llmSelectorsContainer.className = 'form-row';
+            createProviderModelSelectors(modelName, 'llm_primary', categoryData, llmSelectorsContainer, false);
+            contentDiv.appendChild(llmSelectorsContainer);
+
+            const backupLLMTitle = document.createElement('h4'); backupLLMTitle.textContent = "LLM Backup Models"; backupLLMTitle.style.marginTop = "20px";
+            contentDiv.appendChild(backupLLMTitle);
+
+            const llmBackupSchema = categorySchema.backup_models;
+            if (llmBackupSchema) {
+                const backupFormGroup = document.createElement('div'); backupFormGroup.className = 'form-group';
+                backupFormGroup.appendChild(createArrayInput(modelName, category, 'backup_models', categoryData.backup_models || [], llmBackupSchema));
+                contentDiv.appendChild(backupFormGroup);
+            }
+            const otherLLMSettingsTitle = document.createElement('h4'); otherLLMSettingsTitle.textContent = "Other LLM Parameters"; otherLLMSettingsTitle.style.marginTop = "20px";
+            contentDiv.appendChild(otherLLMSettingsTitle);
+        }
 
         if (category === 'vision_settings') {
             const visionEnabledGroup = document.createElement('div'); visionEnabledGroup.className = 'form-group';
             visionEnabledGroup.appendChild(createBooleanInput(modelName, category, 'vision_enabled', categoryData.vision_enabled, categorySchema.vision_enabled));
             contentDiv.appendChild(visionEnabledGroup);
+
+            const primaryVisionTitle = document.createElement('h4'); primaryVisionTitle.textContent = "Primary Vision Model"; primaryVisionTitle.style.marginTop = "0px"; primaryVisionTitle.style.marginBottom = "10px";
+            contentDiv.appendChild(primaryVisionTitle);
             const visionSelectorsContainer = document.createElement('div'); visionSelectorsContainer.className = 'form-row';
-            createProviderModelSelectors(modelName, 'vision', categoryData, visionSelectorsContainer, true);
+            createProviderModelSelectors(modelName, 'vision_primary', categoryData, visionSelectorsContainer, true);
             contentDiv.appendChild(visionSelectorsContainer);
-            const visionBackupSchema = categorySchema.backup_vision_models;
-            if (visionBackupSchema) {
-                const backupVisionFormGroup = document.createElement('div'); backupVisionFormGroup.className = 'form-group';
-                backupVisionFormGroup.appendChild(createArrayInput(modelName, 'vision_settings', 'backup_vision_models', categoryData.backup_vision_models || [], visionBackupSchema));
-                contentDiv.appendChild(backupVisionFormGroup);
+
+            const additionalVisionModelsTitle = document.createElement('h4');
+            additionalVisionModelsTitle.textContent = "Additional Vision Models";
+            additionalVisionModelsTitle.style.marginTop = "20px";
+            contentDiv.appendChild(additionalVisionModelsTitle);
+
+            const visionBackupModelsSchema = categorySchema.backup_models;
+            if (visionBackupModelsSchema) {
+                const visionModelsFormGroup = document.createElement('div'); visionModelsFormGroup.className = 'form-group';
+                visionModelsFormGroup.appendChild(createArrayInput(modelName, 'vision_settings', 'backup_models', categoryData.backup_models || [], visionBackupModelsSchema));
+                contentDiv.appendChild(visionModelsFormGroup);
             }
+            const otherVisionSettingsTitle = document.createElement('h4'); otherVisionSettingsTitle.textContent = "Other Vision Parameters"; otherVisionSettingsTitle.style.marginTop = "20px";
+            contentDiv.appendChild(otherVisionSettingsTitle);
         }
 
         for (const settingKey of fieldOrder) {
             if (categorySchema[settingKey].hidden) continue;
-            if (category === 'llm_settings' && settingKey === 'backup_models') continue;
-            if (category === 'vision_settings' && (settingKey === 'vision_provider' || settingKey === 'vision_endpoint' || settingKey === 'vision_model' || settingKey === 'backup_vision_models' || settingKey === 'vision_enabled')) continue;
+            if (category === 'llm_settings' && (settingKey === 'provider' || settingKey === 'endpoint' || settingKey === 'model' || settingKey === 'backup_models')) continue;
+            if (category === 'vision_settings' && (settingKey === 'provider' || settingKey === 'endpoint' || settingKey === 'model' || settingKey === 'backup_models' || settingKey === 'vision_enabled')) continue;
+
+            if (category === 'prompt_settings' && settingKey === 'dictionary_cache') {
+                const dictCacheSchema = categorySchema[settingKey];
+                const dictCacheData = categoryData[settingKey] || {};
+
+                const dictCollapsibleContainer = document.createElement('div');
+                dictCollapsibleContainer.style.marginTop = '15px';
+                dictCollapsibleContainer.style.marginBottom = '10px';
+
+                const dictHeaderDiv = document.createElement('div');
+                dictHeaderDiv.className = 'collapsible-section sub-collapsible-section';
+                dictHeaderDiv.style.backgroundColor = '#252525';
+                dictHeaderDiv.style.color = '#E0E0E0';
+                dictHeaderDiv.style.padding = '6px 10px';
+                dictHeaderDiv.style.borderRadius = '3px';
+                dictHeaderDiv.style.marginBottom = '5px';
+                dictHeaderDiv.style.cursor = 'pointer';
+
+                const dictHeaderTitle = document.createElement('h4');
+                dictHeaderTitle.style.margin = '0';
+                dictHeaderTitle.style.padding = '0';
+                dictHeaderTitle.style.color = 'inherit';
+                dictHeaderTitle.style.display = 'flex';
+                dictHeaderTitle.style.justifyContent = 'space-between';
+                dictHeaderTitle.style.alignItems = 'center';
+                dictHeaderTitle.innerHTML = `${formatSettingName(settingKey)} <span class="toggle-icon" style="color: inherit;">▼</span>`;
+                dictHeaderDiv.appendChild(dictHeaderTitle);
+
+                const dictContentElement = document.createElement('div');
+                dictContentElement.className = 'collapsible-content';
+
+                const dictSectionKey = `${modelName}-${category}-${settingKey}-collapsible`;
+                const dictIconElement = dictHeaderTitle.querySelector('.toggle-icon');
+
+                if (collapsedSections[dictSectionKey] === undefined) {
+                    collapsedSections[dictSectionKey] = true;
+                }
+
+                const isDictCurrentlyCollapsed = collapsedSections[dictSectionKey] === true;
+                if(dictIconElement) dictIconElement.classList.toggle('collapsed', isDictCurrentlyCollapsed);
+                dictContentElement.classList.toggle('collapsed', isDictCurrentlyCollapsed);
+
+                dictHeaderDiv.onclick = function() {
+                    const targetDictCollapseState = !dictContentElement.classList.contains('collapsed');
+                    dictContentElement.classList.toggle('collapsed', targetDictCollapseState);
+                    if(dictIconElement) dictIconElement.classList.toggle('collapsed', targetDictCollapseState);
+                    collapsedSections[dictSectionKey] = targetDictCollapseState;
+                };
+
+                const dictInputGroup = document.createElement('div');
+                dictInputGroup.className = 'form-group';
+                dictInputGroup.style.padding = '10px';
+                dictInputGroup.appendChild(createDictionaryInput(modelName, category, settingKey, dictCacheData, {...dictCacheSchema, isSubComponent: true}));
+                dictContentElement.appendChild(dictInputGroup);
+
+                dictCollapsibleContainer.appendChild(dictHeaderDiv);
+                dictCollapsibleContainer.appendChild(dictContentElement);
+                contentDiv.appendChild(dictCollapsibleContainer);
+
+                currentFieldsInRow = 0; currentRowElement = null;
+                continue;
+            }
 
             const settingValue = categoryData[settingKey]; const schemaForItem = categorySchema[settingKey];
             let formGroup = document.createElement('div');
             let fieldRendered = true;
-
             const isSmallNumberField = schemaForItem.type === 'number' &&
                 (schemaForItem.max === undefined || schemaForItem.max < 10000) &&
                 (!schemaForItem.step || schemaForItem.step >= 0.01) &&
@@ -551,7 +761,7 @@ function renderModelContent(modelName) {
             if (schemaForItem.type === 'array') {
                 formGroup.appendChild(createArrayInput(modelName, category, settingKey, settingValue || [], schemaForItem));
             } else if (schemaForItem.type === 'dictionary') {
-                formGroup.appendChild(createDictionaryInput(modelName, category, settingKey, settingValue || {}, schemaForItem));
+                 formGroup.appendChild(createDictionaryInput(modelName, category, settingKey, settingValue || {}, schemaForItem));
             } else if (schemaForItem.type === 'boolean') {
                 formGroup.appendChild(createBooleanInput(modelName, category, settingKey, !!settingValue, schemaForItem));
             } else if (schemaForItem.type === 'number') {
@@ -571,16 +781,16 @@ function renderModelContent(modelName) {
             }
             if (currentFieldsInRow >= 3) { currentFieldsInRow = 0; currentRowElement = null; }
         }
-        categorySectionDiv.appendChild(contentDiv); modelSection.appendChild(categorySectionDiv);
     }
     container.appendChild(modelSection);
 }
 
 function createProviderModelSelectors(modelName, settingsGroupKey, configObject, targetElement, isVisionSelectors = false) {
     targetElement.innerHTML = '';
-    const pKey = isVisionSelectors ? 'vision_provider' : (settingsGroupKey === 'primary_llm' ? 'llm_provider' : 'provider');
-    const epKey = isVisionSelectors ? 'vision_endpoint' : (settingsGroupKey === 'primary_llm' ? 'llm_endpoint' : 'endpoint');
-    const mKey = isVisionSelectors ? 'vision_model' : (settingsGroupKey === 'primary_llm' ? 'llm_model' : 'model');
+
+    const pKey = 'provider';
+    const epKey = 'endpoint';
+    const mKey = 'model';
 
     let currentProvider = configObject[pKey];
     let currentModel = configObject[mKey];
@@ -589,7 +799,8 @@ function createProviderModelSelectors(modelName, settingsGroupKey, configObject,
     const sourceForOptions = isVisionSelectors ? visionOptions : modelOptions;
 
     const providerGroup = document.createElement('div'); providerGroup.className = 'form-col';
-    const providerLabel = document.createElement('label'); providerLabel.textContent = `${isVisionSelectors ? 'Vision' : 'LLM'} Provider`;
+    const providerLabelText = settingsGroupKey.includes('backup_') ? 'Backup Provider' : `${isVisionSelectors ? 'Vision' : 'LLM'} Provider`;
+    const providerLabel = document.createElement('label'); providerLabel.textContent = providerLabelText;
     const providerSelect = document.createElement('select'); providerSelect.id = `${modelName}-${settingsGroupKey}-provider`;
 
     Object.keys(sourceForOptions).forEach(pName => {
@@ -607,7 +818,8 @@ function createProviderModelSelectors(modelName, settingsGroupKey, configObject,
     providerGroup.appendChild(providerLabel); providerGroup.appendChild(providerSelect); targetElement.appendChild(providerGroup);
 
     const modelGroup = document.createElement('div'); modelGroup.className = 'form-col';
-    const modelLabel = document.createElement('label'); modelLabel.textContent = `Model`;
+    const modelLabelText = settingsGroupKey.includes('backup_') ? 'Backup Model' : 'Model';
+    const modelLabel = document.createElement('label'); modelLabel.textContent = modelLabelText;
     const modelSelect = document.createElement('select'); modelSelect.id = `${modelName}-${settingsGroupKey}-model`;
     modelGroup.appendChild(modelLabel); modelGroup.appendChild(modelSelect); targetElement.appendChild(modelGroup);
 
@@ -654,7 +866,7 @@ function createProviderModelSelectors(modelName, settingsGroupKey, configObject,
     providerSelect.onchange = function() {
         const newProvider = this.value;
         configObject[pKey] = newProvider; currentProvider = newProvider;
-        currentEndpoint = null; currentModel = null; 
+        currentEndpoint = null; currentModel = null;
         populateModelsAndUpdateStorage(newProvider, sourceForOptions);
         setUnsavedChanges();
     };
@@ -691,7 +903,8 @@ function createTextInput(modelName, category, settingKey, settingValue, schema) 
     const isPasswordField = (settingKey === 'bot_token' && category === null);
     if (isMultiline) {
         inputElement = document.createElement('textarea');
-        inputElement.className = (settingKey === 'prompt_head' || settingKey === 'prompt_tail') ? 'large' : 'medium';
+        const largeMultilineKeys = ['prompt_head', 'prompt_tail', 'dictionary_cache_header', 'reminder', 'vision_prompt'];
+        inputElement.className = largeMultilineKeys.includes(settingKey) ? 'large' : 'medium';
     } else {
         inputElement = document.createElement('input'); inputElement.type = isPasswordField ? 'password' : 'text';
     }
@@ -810,8 +1023,7 @@ function createArrayInput(modelName, category, settingKey, currentArray, arraySc
     function renderArrayEntries() {
         entriesContainer.innerHTML = '';
         const actualArray = settings[modelName]?.[category]?.[settingKey] || [];
-        if (!Array.isArray(actualArray)) { 
-            console.warn(`Expected array for ${modelName}-${category}-${settingKey}, got:`, actualArray);
+        if (!Array.isArray(actualArray)) {
             settings[modelName][category][settingKey] = [];
         }
         (settings[modelName][category][settingKey] || []).forEach((itemValue, index) => {
@@ -828,11 +1040,15 @@ function createArrayEntryElement(modelName, category, settingKey, index, itemVal
     const entryDiv = document.createElement('div'); entryDiv.className = 'array-entry section';
     entryDiv.style.padding = '10px'; entryDiv.style.marginBottom = '10px'; entryDiv.style.backgroundColor = '#272727';
     if (arraySchema && arraySchema.itemSchema && arraySchema.itemSchema.provider && arraySchema.itemSchema.model) {
-        const isVisionBackup = settingKey.includes('vision_models');
+        const isVisionContextForBackupModels = (category === 'vision_settings' && settingKey === 'backup_models');
         const backupItemSelectorsContainer = document.createElement('div'); backupItemSelectorsContainer.className = 'form-row';
-        const itemGroupKey = `${settingKey.replace('_models', '')}_${index}`;
+        const itemGroupKey = `backup_${isVisionContextForBackupModels ? 'vision' : 'llm'}_${index}`;
         const currentItemValue = itemValue || {};
-        createProviderModelSelectors(modelName, itemGroupKey, currentItemValue, backupItemSelectorsContainer, isVisionBackup);
+            if (!currentItemValue.endpoint ) {
+            const defaultSelections = getFirstProviderAndModelDetails(isVisionContextForBackupModels);
+            if(defaultSelections.endpoint) currentItemValue.endpoint = defaultSelections.endpoint;
+        }
+        createProviderModelSelectors(modelName, itemGroupKey, currentItemValue, backupItemSelectorsContainer, isVisionContextForBackupModels);
         entryDiv.appendChild(backupItemSelectorsContainer);
     } else {
         const inputElement = document.createElement('input');
@@ -857,9 +1073,13 @@ function addArrayEntry(modelName, category, settingKey, arraySchema) {
     }
     let newItem;
     if (arraySchema && arraySchema.itemSchema && arraySchema.itemSchema.provider) {
-        const isVision = settingKey.includes('vision_models');
+        const isVision = (category === 'vision_settings' && settingKey === 'backup_models');
         const defaultSelections = getFirstProviderAndModelDetails(isVision);
-        newItem = { provider: defaultSelections.provider, endpoint: defaultSelections.endpoint, model: defaultSelections.model };
+        newItem = {
+            provider: defaultSelections.provider,
+            endpoint: defaultSelections.endpoint,
+            model: defaultSelections.model
+        };
     } else {
         const itemType = (arraySchema && arraySchema.itemType) || 'text';
         newItem = itemType === 'number' ? 0 : '';
@@ -877,40 +1097,63 @@ function addArrayEntry(modelName, category, settingKey, arraySchema) {
 function createDictionaryInput(modelName, category, settingKey, currentValue, schema) {
     const container = document.createElement('div');
     const fieldId = `${modelName}-${category}-${settingKey}`;
-    const labelContainer = document.createElement('div'); labelContainer.className = 'label-container';
-    const dictLabel = document.createElement('label'); dictLabel.setAttribute('for', fieldId); dictLabel.textContent = formatSettingName(settingKey);
-    labelContainer.appendChild(dictLabel);
-    if (schema && schema.tooltip) { labelContainer.appendChild(createTooltip(schema.tooltip)); }
-    container.appendChild(labelContainer);
-    const entriesContainerId = `${fieldId}-entries`;
-    const entriesContainer = document.createElement('div'); entriesContainer.id = entriesContainerId;
-    container.appendChild(entriesContainer);
-    const addButton = document.createElement('button'); addButton.className = 'add-entry'; addButton.textContent = '+ Add Entry';
-    addButton.onclick = function() { addDictionaryEntry(modelName, category, settingKey); };
-    container.appendChild(addButton);
-    function renderDictEntries() {
-        const currentDict = settings[modelName][category]?.[settingKey] || {};
-         if (typeof currentDict !== 'object' || currentDict === null) {
-            console.warn(`Expected object for ${modelName}-${category}-${settingKey}, got:`, currentDict);
-            settings[modelName][category][settingKey] = {};
+
+    if (!(schema && schema.isSubComponent)) {
+        const labelContainer = document.createElement('div');
+        labelContainer.className = 'label-container';
+        const dictLabel = document.createElement('label');
+        dictLabel.setAttribute('for', fieldId);
+        dictLabel.textContent = formatSettingName(settingKey);
+        labelContainer.appendChild(dictLabel);
+        if (schema && schema.tooltip) {
+            labelContainer.appendChild(createTooltip(schema.tooltip));
         }
+        container.appendChild(labelContainer);
+    }
+
+    const entriesContainerId = `${fieldId}-entries`;
+    const entriesContainer = document.createElement('div');
+    entriesContainer.id = entriesContainerId;
+    entriesContainer.style.maxHeight = '300px';
+    entriesContainer.style.overflowY = 'auto';
+    container.appendChild(entriesContainer);
+
+    const addButton = document.createElement('button');
+    addButton.className = 'add-entry';
+    addButton.textContent = '+ Add Entry';
+    addButton.onclick = function() {
+        addDictionaryEntry(modelName, category, settingKey);
+        setTimeout(() => {
+            if (entriesContainer.scrollHeight > entriesContainer.clientHeight) {
+                entriesContainer.scrollTop = entriesContainer.scrollHeight;
+            }
+        }, 0);
+    };
+    container.appendChild(addButton);
+
+    function renderDictEntries() {
+        let dictToRender = settings[modelName]?.[category]?.[settingKey];
+        if (typeof dictToRender !== 'object' || dictToRender === null) {
+            dictToRender = {};
+            settings[modelName][category][settingKey] = dictToRender;
+        }
+
         const keyOrder = [];
         const existingKeyElements = entriesContainer.querySelectorAll('.dictionary-entry .dictionary-key input');
         existingKeyElements.forEach(inputEl => {
             const key = inputEl.dataset.originalKey || inputEl.value;
-            if (currentDict.hasOwnProperty(key) && !keyOrder.includes(key)) {
+            if (dictToRender.hasOwnProperty(key) && !keyOrder.includes(key)) {
                 keyOrder.push(key);
             }
         });
-        for (const keyInDict in currentDict) {
-            if (!keyOrder.includes(keyInDict)) {
+        for (const keyInDict in dictToRender) {
+            if (dictToRender.hasOwnProperty(keyInDict) && !keyOrder.includes(keyInDict)) {
                 keyOrder.push(keyInDict);
             }
         }
         entriesContainer.innerHTML = '';
         keyOrder.forEach(dictKey => {
-            if (!currentDict.hasOwnProperty(dictKey)) return;
-            const dictValue = currentDict[dictKey];
+            const dictValue = dictToRender[dictKey];
             const entryDiv = createDictionaryEntryElement(modelName, category, settingKey, dictKey, dictValue, renderDictEntries);
             entriesContainer.appendChild(entryDiv);
         });
@@ -935,40 +1178,65 @@ function createDictionaryEntryElement(modelName, category, settingKey, dictKey, 
 
         const newOrderedDict = {};
         const allKeyInputElements = Array.from(this.closest(`#${modelName}-${category}-${settingKey}-entries`).querySelectorAll('.dictionary-entry .dictionary-key input'));
-
         allKeyInputElements.forEach(inpEl => {
             let k = inpEl.dataset.originalKey;
-            if(inpEl === this) k = oldKey;
-            let v = currentDict[k];
-            if (k === oldKey) { newOrderedDict[newKey] = v; }
-            else if (currentDict.hasOwnProperty(k)) { newOrderedDict[k] = v; }
+            if(inpEl === this) {
+                newOrderedDict[newKey] = currentDict[oldKey];
+            } else if (currentDict.hasOwnProperty(k)) {
+                newOrderedDict[k] = currentDict[k];
+            }
         });
-        for(const k_orig in currentDict){
-            if(k_orig !== oldKey && !Object.values(newOrderedDict).includes(currentDict[k_orig])) {
-                let stillMissing = true;
-                for(const new_k in newOrderedDict){ if(newOrderedDict[new_k] === currentDict[k_orig]) stillMissing=false; }
-                if(stillMissing && !newOrderedDict.hasOwnProperty(k_orig)) newOrderedDict[k_orig] = currentDict[k_orig];
+
+        for(const original_dict_key in currentDict){
+            if (!newOrderedDict.hasOwnProperty(original_dict_key) && original_dict_key !== oldKey) {
+                 newOrderedDict[original_dict_key] = currentDict[original_dict_key];
+            } else if (original_dict_key === oldKey && !newOrderedDict.hasOwnProperty(newKey) ) {
+                 newOrderedDict[newKey] = currentDict[oldKey];
             }
         }
         settings[modelName][category][settingKey] = newOrderedDict;
         this.dataset.originalKey = newKey;
         setUnsavedChanges();
     };
-    valueInput.onchange = function() { updateDictionaryValue(modelName, category, settingKey, keyInput.value, this.value); };
+    valueInput.onchange = function() { updateDictionaryValue(modelName, category, settingKey, keyInput.dataset.originalKey, this.value); };
     const removeButton = document.createElement('button'); removeButton.className = 'remove-entry delete-btn'; removeButton.textContent = '-';
-    removeButton.onclick = function() { removeDictionaryEntry(modelName, category, settingKey, keyInput.value); rerenderCallback(); };
+    removeButton.onclick = function() { removeDictionaryEntry(modelName, category, settingKey, keyInput.dataset.originalKey); rerenderCallback(); };
     entryDiv.appendChild(keyInput); entryDiv.appendChild(valueInput); entryDiv.appendChild(removeButton);
     return entryDiv;
 }
 
 function addDictionaryEntry(modelName, category, settingKey) {
-    let newKeyBase = `new_key_`; let i = 1; let newKey = `${newKeyBase}${i}`;
-    const currentDict = settings[modelName][category][settingKey] || {};
-    settings[modelName][category][settingKey] = currentDict; 
-    while(currentDict.hasOwnProperty(newKey)) { newKey = `${newKeyBase}${++i}`; }
-    currentDict[newKey] = ''; setUnsavedChanges();
+    let newKeyBase = `new_key_`;
+    let i = 1;
+    let newKey = `${newKeyBase}${i}`;
+
+    if (!settings[modelName]) {
+        settings[modelName] = {};
+    }
+    if (!settings[modelName][category]) {
+        settings[modelName][category] = {};
+    }
+
+    if (typeof settings[modelName][category][settingKey] !== 'object' || settings[modelName][category][settingKey] === null) {
+        settings[modelName][category][settingKey] = {};
+    }
+
+    const targetDictionary = settings[modelName][category][settingKey];
+
+    while (targetDictionary.hasOwnProperty(newKey)) {
+        newKey = `${newKeyBase}${++i}`;
+    }
+
+    targetDictionary[newKey] = '';
+
+    setUnsavedChanges();
+
     const entriesContainer = document.getElementById(`${modelName}-${category}-${settingKey}-entries`);
-    if (entriesContainer && entriesContainer.renderEntries) { entriesContainer.renderEntries(); } else { renderModelContent(activeTab); }
+    if (entriesContainer && entriesContainer.renderEntries) {
+        entriesContainer.renderEntries();
+    } else {
+        renderModelContent(activeTab);
+    }
 }
 
 function setUnsavedChanges() {
@@ -990,7 +1258,12 @@ function updateArrayValue(modelName, category, settingKey, index, value) {
 }
 
 function updateDictionaryValue(modelName, category, settingKey, key, value) {
-    if (settings[modelName]?.[category]?.[settingKey] !== undefined) { settings[modelName][category][settingKey][key] = value; setUnsavedChanges(); }
+    if (settings[modelName]?.[category]?.[settingKey] !== undefined) {
+        if (settings[modelName][category][settingKey].hasOwnProperty(key)) {
+            settings[modelName][category][settingKey][key] = value;
+            setUnsavedChanges();
+        }
+    }
 }
 
 function removeArrayEntry(modelName, category, settingKey, index) {
@@ -1038,26 +1311,22 @@ async function fetchSettings() {
     try {
         uiInitTime = Date.now();
         const response = await fetch('/api/settings?t=' + Date.now());
-
         if (!response.ok) {
             const responseText = await response.text().catch(() => "");
             if (response.status >= 400 || !responseText.trim() || responseText.trim() === "{}") {
-                 console.warn(`Settings fetch failed or was empty (status ${response.status}). Initializing defaults.`);
-                 settings = initializeDefaultSettings();
+                settings = initializeDefaultSettings();
             } else {
-                 try {
+                try {
                     const parsed = JSON.parse(responseText);
                     if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed) || Object.keys(parsed).length === 0) {
-                        console.warn("Fetched settings were not a valid object. Initializing defaults.");
                         settings = initializeDefaultSettings();
                     } else {
                         settings = parsed;
                     }
-                 } catch (e) {
-                    console.error("Error parsing fetched settings:", e, "Raw text:", responseText);
+                } catch (e) {
                     showNotification('Error parsing settings from server. Using defaults.', 'error');
                     settings = initializeDefaultSettings();
-                 }
+                }
             }
         } else {
             const text = await response.text();
@@ -1066,36 +1335,29 @@ async function fetchSettings() {
             } else {
                 try {
                     const parsed = JSON.parse(text);
-                     if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) {
-                        console.warn("Fetched settings were not a valid object despite OK response. Initializing defaults.");
+                        if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) {
                         settings = initializeDefaultSettings();
                     } else {
                         settings = parsed;
                     }
                 } catch (parseError) {
-                    console.error("Error parsing settings JSON:", parseError, "Raw text:", text);
                     showNotification('Invalid settings JSON from server, using defaults.', 'error');
                     settings = initializeDefaultSettings();
                 }
             }
         }
-
         if (Object.keys(settings).length === 0) {
             settings = initializeDefaultSettings();
         }
         for (const modelName in settings) {
             ensureSettingsExist(modelName);
         }
-        
         if (Object.keys(settings).length === 0) {
-             addNewModel("BotName");
+            addNewModel("BotName");
         }
-
         createModelTabs();
         activateTab(Object.keys(settings)[0]);
-
     } catch (error) {
-        console.error('Critical error fetching or processing settings:', error);
         showNotification('Error fetching settings: ' + error.message, 'error');
         settings = initializeDefaultSettings();
         for (const modelName in settings) { ensureSettingsExist(modelName); }
@@ -1216,7 +1478,7 @@ async function checkBotStatus() {
 function updateBotStatusUI(isRunning) {
     botRunning = isRunning;
     const button = document.getElementById('bot-control-btn'); const indicator = document.getElementById('bot-status-indicator');
-    button.innerHTML = ''; 
+    button.innerHTML = '';
     if (isRunning) {
         indicator.className = 'bot-status-indicator status-running'; button.appendChild(indicator); button.appendChild(document.createTextNode(' Stop Bot')); button.className = 'bot-control-btn stop-btn';
     } else {

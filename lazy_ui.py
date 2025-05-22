@@ -98,23 +98,34 @@ class BotProcess:
                         cwd=SRC_DIR,
                         env=bot_env,
                         creationflags=creation_flags,
-                        startupinfo=startupinfo
+                        startupinfo=startupinfo,
+                        stdout=subprocess.PIPE,
+                        stderr=subprocess.PIPE,
+                        text=True
                     )
                 else:
                     self.process = subprocess.Popen(
                         [sys.executable, bot_script_path, os.path.abspath(settings_file_for_bot)],
                         cwd=SRC_DIR,
                         env=bot_env,
-                        preexec_fn=os.setsid
+                        preexec_fn=os.setsid,
+                        stdout=subprocess.PIPE,
+                        stderr=subprocess.PIPE,
+                        text=True
                     )
                 
                 time.sleep(2)
 
                 if self.process.poll() is not None:
                     exit_code = self.process.returncode
-                    logger.error(f"Bot process exited immediately with code {exit_code}. Check bot logs.")
+                    stdout_data, stderr_data = self.process.communicate()
+                    if stdout_data:
+                        logger.error(f"Bot process stdout:\n{stdout_data.strip()}")
+                    if stderr_data:
+                        logger.error(f"Bot process stderr:\n{stderr_data.strip()}")
+                    logger.error(f"Bot process exited immediately with code {exit_code}. See captured output above.")
                     self.process = None
-                    return False, f"Bot failed to start (exit code {exit_code}). Check bot logs."
+                    return False, f"Bot failed to start (exit code {exit_code}). See server logs for bot output."
                 
                 logger.info(f"Bot started with PID: {self.process.pid}")
                 return True, self.process.pid
@@ -219,13 +230,13 @@ class SettingsHandler(http.server.SimpleHTTPRequestHandler):
                 self.end_headers()
                 self.wfile.write(settings_data.encode('utf-8'))
             except FileNotFoundError:
-                self.send_response(200) # Send empty JSON if file not found, client will init
+                self.send_response(200) 
                 self.send_header("Content-type", "application/json; charset=utf-8")
                 self.end_headers()
                 self.wfile.write(b"{}")
             except json.JSONDecodeError as e:
                 logger.error(f"Invalid JSON in settings file: {e}. Sending empty JSON to client.")
-                self.send_response(200) # Send empty JSON if corrupt, client will init
+                self.send_response(200) 
                 self.send_header("Content-type", "application/json; charset=utf-8")
                 self.end_headers()
                 self.wfile.write(b"{}")
@@ -294,7 +305,7 @@ class SettingsHandler(http.server.SimpleHTTPRequestHandler):
                 token_key = token_data.get('token_key')
                 token_value = token_data.get('token_value')
 
-                if not token_key or not isinstance(token_key, str) or token_value is None: # Allow empty string for token_value to clear
+                if not token_key or not isinstance(token_key, str) or token_value is None: 
                     raise ValueError("Missing or invalid 'token_key'. 'token_value' can be empty to clear.")
                 
                 if not all(c.isalnum() or c == '_' for c in token_key):

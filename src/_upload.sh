@@ -9,6 +9,7 @@ docker build -t bot .
 # Save image to tar file
 docker save bot | gzip > bot.tar.gz
 
+# Mgiht need to add restarter
 # Upload to EC2
 scp -i ~/.ssh/my-ec2-key.pem bot.tar.gz ec2-user@$AWS_ADDRESS:/home/ec2-user/
 

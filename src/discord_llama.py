@@ -10,33 +10,16 @@ from logger import log
 
 load_dotenv()
 
-class discord_llama:
-    
-    def __init__(self, api_key: str = None, params: dict = {}):
+class chat_manager:
+    def __init__(self, completion_client: CompletionGenerator, vision_client: VisionProcessor, params: Parameters):
         
-        self.client = CompletionGenerator(api_key)
-        self.Params = Parameters(params)
+        self.Params: Parameters = params
+        self.client: CompletionGenerator = completion_client
+        self.vision_client: VisionProcessor = vision_client
+        
         self.input_tokens = 0
         self.output_tokens = 0
-        
-        self.vision_client = VisionProcessor()
     
-    def set_parameters(self, configuration_dict):
-        if (not configuration_dict):
-            log.error("ERROR: no configuration")
-        self.Params = Parameters(configuration_dict)
-        
-    def set_vision_client(self, vision_client):
-        self.vision_client = vision_client
-    
-    def set_parameters(self, configuration_dict):
-        if (not configuration_dict):
-            log.error("ERROR: no configuration")
-        self.Params = Parameters(configuration_dict)
-    
-    def set_prompt_manager(self, prompt_manager: PromptManager):
-        self.Params.set_prompt(prompt_manager)
-        
     def set_api_key(self, api_key: str = None):
         self.client = CompletionGenerator(api_key)
 
@@ -90,11 +73,9 @@ class discord_llama:
     
     def add_user_message(self, message: str, name: str = ""):
         self.search(message, name)
-        log.debug(f"adding message {name}: {message}")
         self.Params.messages.append(Role.user, message, name)
 
     def add_assistant_message(self, message: str, name: str = ""):
-        log.debug(f"adding message {name}: {message}")
         self.Params.messages.append(Role.assistant, message, name)
 
     def clear_memory(self):
@@ -119,6 +100,7 @@ class discord_llama:
         return self.vision_client.is_vision_enabled()
     
     async def generate_response(self) -> str:
+        
         message = ""
         request = {}
         try:
@@ -136,8 +118,10 @@ class discord_llama:
             think_end = message.find("</think>")
             if message and think_end >= 0:
                 message = message[think_end+len("</think>"):].strip()
-            else:
-                log.error("Tried to think but did not finish thinking")
+            if message.find("<think>") > 0:
+                log.error("tried to think but failed to finish though")
+                message = "I'm a dumb dumb baka waka who tried to think but failed!"
+                return 
                 
             log.debug(f"{initial_len - len(message)} think characters removed")
             if message and message[0] == "<":
@@ -174,3 +158,9 @@ class discord_llama:
         for message in self.Params.get_messages():
             log.info(f"{message.role}: {message.content}")
         return
+    
+    def _get_chat(self) -> dict:
+        return self.Params.to_dict()
+    
+    def _get_rates(self) -> str:
+        return f"input:({self.input_tokens}), output:({self.output_tokens})"

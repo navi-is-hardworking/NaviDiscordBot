@@ -2,7 +2,7 @@ import os
 import time
 import discord
 from discord.ext import commands
-from discord_llama import discord_llama
+from discord_llama import chat_manager
 import asyncio
 from rate_limit import RateLimit
 import random
@@ -14,9 +14,11 @@ from logger import log
 import random
 
 class DiscordBot:
-    def __init__(self, bot_name: str, bot_token_location: str, setting_dictionary: dict, chat: discord_llama):
+
+
+    def __init__(self, bot_name: str, bot_token_location: str, setting_dictionary: dict, chat: chat_manager):
         
-        self.chat: discord_llama = chat
+        self.chat: chat_manager = chat
         self.bot_token_location = bot_token_location
         self.max_user_input_message_length = setting_dictionary['max_user_input_message_length']
         self.chat_clear_time = setting_dictionary['chat_clear_time']
@@ -27,6 +29,7 @@ class DiscordBot:
         self.monitored_channels = [int(x) for x in setting_dictionary['monitored_channels']]
         self.partial_ignore_list = [int(x) for x in setting_dictionary['partial_ignore_list']]
         self.full_ignore_list = [int(x) for x in setting_dictionary['full_ignore_list']]
+        self.admin_list = [int(x) for x in setting_dictionary['admins']]
         
         self.typing_delay_range = setting_dictionary['typing_delay_range']
         self.rate_limiter = RateLimit(
@@ -46,14 +49,19 @@ class DiscordBot:
         self.last_message_time = -self.chat_clear_time - 1
         self.message_queue: deque[discord.Message] = deque()
         
+        log.debug(f"Discord bot {bot_name} initialized.")
+        
+    
+    
     
     def add_message_to_context(self, user_name: str, msg: str):
         if (len(msg) > self.max_user_input_message_length):
             msg = msg[0:self.max_user_input_message_length]
             
-        # self.prompter.static_search(user_name, msg)
         self.chat.add_user_message(msg, user_name)
-        
+    
+    
+    
     
     async def process_message_queue(self, channel):
         while not self.rate_limiter.full() and len(self.message_queue) > 0 and self.processing_lock.acquire(blocking=False):
@@ -64,6 +72,8 @@ class DiscordBot:
             finally:
                 self.processing_lock.release()
             
+    
+    
     
     async def wait_process_response(self, channel):
         async with channel.typing():
@@ -79,7 +89,6 @@ class DiscordBot:
                 for channel in response_targets:
                     if sent:
                         await channel.send("! " + response)
-                        
                     else:
                         await channel.send(response) 
                         sent = True
@@ -90,9 +99,13 @@ class DiscordBot:
             log.debug(f"{self.bot_name}: FULL elapsed time: {time.time() - start_time}")
             
     
+    
+    
     async def calculate_wait_time(self):
         delay = random.uniform(self.typing_delay_range[0], self.typing_delay_range[1])
         await asyncio.sleep(delay)
+    
+    
     
     
     def prepare_context(self):
@@ -114,21 +127,30 @@ class DiscordBot:
             response_targets.add(message.channel)
             
         return response_targets
-            
+    
+    
+    
     
     async def on_ready(self):
         log.info(f'{self.bot.user} has connected to Discord!')
-        
+    
+    
+    
     
     async def start(self):
+        log.debug(f"Environment variable {self.bot_token_location}")
         token = os.environ.get(self.bot_token_location)
         if not token:
             log.error(f"Environment variable {self.bot_token_location} not set!")
             raise ValueError(f"Environment variable {self.bot_token_location} not set!")
         await self.bot.start(token)
         
+    
+    
+    
     def get_context(self):
         return self.chat.get_context()
+    
     
     
     async def handle_image_processing(self, message: discord.Message):
@@ -155,7 +177,9 @@ class DiscordBot:
         else:
             log.warning("tried to process image but imaging was not enabled")
     
-    def handle_random_occurance(self, message) -> bool:
+    
+    
+    def handle_random_occurance(self, message: discord.Message) -> bool:
         if not self.random_occurences_enabled:
                 return True
         elif (time.time() - self.last_message_time > self.chat_clear_time):
@@ -167,30 +191,68 @@ class DiscordBot:
         elif random.randint(0, 99): # %1 chance
             return True
     
+    
+    
+    async def handle_admin_command(self, message: discord.Message):
+        args = message.content.split(" ")
+        command = args[0]
+        log.debug(f"processing command {args}")
+        if command == "!reset":
+            self.chat.clear_memory()
+        
+        elif command == "!context":
+            full_context = self.chat._get_chat()
+            
+            await message.author.send(f"model: {full_context['model']}")
+            await message.author.send(f"max_tokens: {full_context['max_tokens']}")
+            await message.author.send(f"temperature: {full_context['temperature']}")
+            await message.author.send(f"top_p: {full_context['top_p']}")
+            await message.author.send(f"top_k: {full_context['top_k']}")
+            await message.author.send(f"frequency_penalty: {full_context['frequency_penalty']}")
+            await message.author.send(f"presence_penalty: {full_context['presence_penalty']}")
+            await message.author.send(f"n: {full_context['n']}")
+            await message.author.send(f"stream: {full_context['stream']}")
+            await message.author.send(f"stop: {full_context['stop']}")
+        
+        elif command == "!rates":
+            rates_string: str = self.chat._get_rates()
+            await message.author.send("!" + rates_string)
+        
+        
+        return
+    
+    
+    
     ######## Where messages comes in / main logic ########
     async def on_message(self, message: discord.Message):
         # print("recieved message1")
         # print(f"author({message.author == self.bot.user})")
         # print(f"ignore({message.author.id in self.full_ignore_list})")
         # print(f"comment({not message.content.find("!")})")
+        # if not message.content.find("!"):
+            
+        if self.admin_list and message.author.id in self.admin_list and not message.content.find("!"):
+            # todo handle command
+            await self.handle_admin_command(message)
+            return
         
         if message.author == self.bot.user or message.author.id in self.full_ignore_list or not message.content.find("!"):
             return
         
-        print("recieved message2")
+        # print("recieved message2")
         if message.channel.id not in self.monitored_channels:
             if self.handle_random_occurance(message):
                 return True
                 
-        print("recieved message3")
+        # print("recieved message3")
         if len(message.content) == 0 and len(message.attachments) == 0:
             return
             
-        print("recieved message4")
+        # print("recieved message4")
         if self.rate_limiter.full():
             return
             
-        print("recieved message5")
+        # print("recieved message5")
         # log.debug(f"raw message: {message.content}")
         # log.debug(f"attachments: {message.attachments}")
         # log.debug(f"author: {message.author}")
@@ -211,6 +273,5 @@ class DiscordBot:
         self.message_queue.append(message)
         
         await self.process_message_queue(message.channel)
-        
         await self.bot.process_commands(message)
         

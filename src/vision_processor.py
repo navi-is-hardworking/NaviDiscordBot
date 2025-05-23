@@ -15,20 +15,14 @@ class VisionProcessor:
         vision_enabled: bool,
         primary_provider: LLM_Provider,
         backup_providers: list[LLM_Provider],
-        max_vision_queries_per_interval: list[str],
-        vision_limit_interval: str,
         vision_prompt: str,
         max_output_length=300
     ):
         self.enabled: bool = vision_enabled
         self.providers: list[LLM_Provider] = backup_providers
         self.providers.insert(0, primary_provider)
-        
-        self.max_vision_queries_per_interval: list[str] = max_vision_queries_per_interval
-        self.vision_limit_interval: str = vision_limit_interval
         self.vision_prompt: str = vision_prompt
         self.max_length = max_output_length
-        self.rate_limiter = RateLimit(limit=self.max_vision_queries_per_interval, interval=vision_limit_interval)
         
         ignored_words = [".", ",", "?", "!", ";"]
         ignored_words = sorted(ignored_words, key=len, reverse=True)

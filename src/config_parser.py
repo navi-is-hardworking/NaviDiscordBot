@@ -3,12 +3,11 @@ import os
     
         
 def parse_json(json_path) -> dict:
-    
     with open(json_path, "r", encoding='utf-8') as f:
         data = json5.load(f)
-    
     return data
         
+
 def parse_prompt(prompt_path):
     head_path = prompt_path + "/prompt_head"
     tail_path = prompt_path + "/prompt_tail"

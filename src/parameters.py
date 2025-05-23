@@ -1,6 +1,7 @@
 from message_queue import MessageQueue, Role, Message
 from prompt_manager import PromptManager
 from logger import log
+from serialization_definitions import Message, Role
 
 class Parameters:
     model: str
@@ -16,9 +17,12 @@ class Parameters:
     stop: set[str]
     reminder: str = None
     
+    
     def __init__(self, prompt_manager, configuration_dict: dict):
         self.prompt_manager = prompt_manager
-        self.messages = MessageQueue(configuration_dict.get('max_context_length', 3000), configuration_dict.get('min_context_length', 0))
+        self.max_context_length = configuration_dict.get('max_context_length', 3000)
+        self.min_context_length = configuration_dict.get('min_context_length', 0)
+        self.messages = MessageQueue(self.max_context_length, self.min_context_length)
         self.model = configuration_dict.get('model', "accounts/fireworks/models/llama4-maverick-instruct-basic")
         self.max_tokens = configuration_dict.get('max_tokens', 100)
         self.temperature = configuration_dict.get('temperature', 0.6)
@@ -46,23 +50,27 @@ class Parameters:
                 stop={self.stop}
                 reminder={self.reminder} ''' )
     
+    
     def set_prompt(self, prompt_manager: PromptManager):
         self.prompt_manager = prompt_manager
         
+    
     # same without warnings... Mainly just for printing and debugging
-    def get_messages(self) -> list[dict]:
+    def _get_messages(self, messages: MessageQueue, prompt: Message) -> list[dict]:
         serialized_messages = []
-        if self.prompt_manager.has_prompt():
-            serialized_messages.append(self.prompt_manager.get_prompt())
+        if prompt:
+            serialized_messages.append(prompt.to_dict())
             
-        serialized_messages += self.messages.to_list()
+        serialized_messages += messages.to_list()
         if (self.reminder):
             serialized_messages.append(Message(Role.user, self.reminder).to_dict())
         
         return serialized_messages
     
-    def serialize_messages(self):
-        serialized_messages = self.get_messages()
+    
+    def _serialize_messages(self, messages: MessageQueue, prompt: Message):
+        serialized_messages = self._get_messages(messages, prompt)
+        
         if not serialized_messages:
             log.warning("WARNING: No messages found in context")
             return serialized_messages
@@ -72,18 +80,17 @@ class Parameters:
             log.warning("WARNING: first message in context cannot be from assistant")
         elif head_role == Role.system and ((len(serialized_messages) < 2) or serialized_messages[1]['role'] == Role.assistant):
             log.warning("WARNING: first in context messages cannot be from assistant")
-        if self.messages.back() and self.messages.back().role == Role.assistant:
+        if messages.back() and messages.back().role == Role.assistant:
             log.warning("WARNING: last message in context cannot be from assistant")
-            log.warning(f"last message: {self.messages.back().content}")
+            log.warning(f"last message: {messages.back().content}")
         
         return serialized_messages
     
-    def to_dict(self):
-        
+    
+    def get_serialize_params(self):
         serialized_params = {
             "model": self.model,
             "max_tokens": self.max_tokens,
-            "messages": self.serialize_messages(),
             "temperature": self.temperature,
             "top_p": self.top_p,
             "top_k": self.top_k,
@@ -94,4 +101,25 @@ class Parameters:
             "stop": list(self.stop)
         }
         return serialized_params
+        
+    
+    def to_dict(self):
+        serialized_params = self.get_serialize_params()
+        serialized_params["messages"] = self._serialize_messages(self.messages, self.prompt_manager.get_prompt())
+        return serialized_params
+        
+    
+    def create_mock_payload(self, messages: list[Message]):
+        mockMessages = MessageQueue(self.max_context_length, self.min_context_length)
+        mockPrompt = self.prompt_manager.create_mock_prompt(messages)
+        
+        for msg in messages:
+            mockMessages.append(msg.role, msg.content, msg.name)
+            
+        # print("finished adding messages classes")
+        params = self.get_serialize_params()
+        params["messages"] = self._serialize_messages(mockMessages, mockPrompt)
+        return params
+            
+        
     

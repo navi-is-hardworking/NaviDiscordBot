@@ -1,18 +1,17 @@
 import os
-from message_queue import Role, Message
+from serialization_definitions import Message, Role
 from parameters import Parameters
-from prompt_manager import PromptManager
 from dotenv import load_dotenv
 from completion_generator import CompletionGenerator
 from vision_processor import VisionProcessor
-from rate_limit import RateLimit
 from logger import log
 
 load_dotenv()
 
 class chat_manager:
-    def __init__(self, completion_client: CompletionGenerator, vision_client: VisionProcessor, params: Parameters):
+    def __init__(self, char_name: str, completion_client: CompletionGenerator, vision_client: VisionProcessor, params: Parameters):
         
+        self.char_name = char_name
         self.Params: Parameters = params
         self.client: CompletionGenerator = completion_client
         self.vision_client: VisionProcessor = vision_client
@@ -69,7 +68,7 @@ class chat_manager:
         self.Params.messages.append(Role.event, message)
         
     def search(self, message: str, name: str = ""):
-        self.Params.prompt_manager.search(message=message, username=name)
+        self.Params.prompt_manager.update_dictionary(message=message, username=name)
     
     def add_user_message(self, message: str, name: str = ""):
         self.search(message, name)
@@ -99,20 +98,14 @@ class chat_manager:
     def is_vision_enabled(self):
         return self.vision_client.is_vision_enabled()
     
-    async def generate_response(self) -> str:
-        
+    
+    async def _get_completion(self, context) -> str:
         message = ""
         request = {}
         try:
-            context = self.Params.to_dict()
             request = await self.client.fetch_completion(context)
-            
             message: str = request['choices'][0]['message']['content']
-            # log.debug(f"response length{len(message)}")
             initial_len = len(message)
-            self.input_tokens += request['usage']['prompt_tokens']
-            self.output_tokens += request['usage']['completion_tokens']
-            log.info(f"==usage==\ninput: {self.input_tokens}\noutput: {self.output_tokens}")
             
             # TODO: optimize to prevent unnessisary checks
             think_end = message.find("</think>")
@@ -132,9 +125,19 @@ class chat_manager:
                 elif message.find("<think>") >= 0:
                     log.error(f"Found thinking content but could not find thinking end")
                 
-            self.add_assistant_message(message)
+            return message, request['usage']['prompt_tokens'], request['usage']['completion_tokens']
         except Exception as e:
             log.error(f"error generating response {e}: payload from api {request}")
+        
+    
+    async def generate_response(self) -> str:
+        context = self.Params.to_dict()
+        message, input_used, output_used = await self._get_completion(context)
+        
+        self.input_tokens += input_used
+        self.output_tokens += output_used
+        log.info(f"==usage==\ninput: {self.input_tokens}\noutput: {self.output_tokens}")
+        self.add_assistant_message(message)
             
         return message
         
@@ -155,12 +158,24 @@ class chat_manager:
         log.info('==usage==')
         log.info(f"input:({self.input_tokens}), output:({self.output_tokens})")
         
-        for message in self.Params.get_messages():
+        for message in self.Params._get_messages():
             log.info(f"{message.role}: {message.content}")
         return
+    
     
     def _get_chat(self) -> dict:
         return self.Params.to_dict()
     
+    
     def _get_rates(self) -> str:
         return f"input:({self.input_tokens}), output:({self.output_tokens})"
+    
+    
+    async def get_oneshot_response(self, messages: list[Message]):
+        payload = self.Params.create_mock_payload(messages)
+        log.debug(f"sending one shot response: {payload}")
+        message, input_used, output_used = await self._get_completion(payload)
+        self.input_tokens += input_used
+        self.output_tokens += output_used
+        return message
+        

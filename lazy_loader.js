@@ -48,7 +48,7 @@ const modelOptions = {
 let settingsSchema = {
     _global: {
         enabled: { type: 'boolean', tooltip: 'Enable or disable this bot' },
-        bot_token: { type: 'text', tooltip: 'Discord Bot Token (Stored in .env based on Bot Name)' },
+        bot_token: { type: 'text', tooltip: 'Discord Bot Token' },
         prompt_settings: {
             prompt_head: { type: 'text', multiline: true, tooltip: 'The main part of the prompt. Add style guidelines and Character definition here.' },
             dictionary_cache_header: { type: 'text', multiline: true, tooltip: '(Optional) Header text for the dictionary_cache section. Tell the bot what the dictionary_cache means. ie. # Memories, # Notes:, # Response examples... etc...' },
@@ -71,19 +71,19 @@ let settingsSchema = {
                 }
             },
             max_context_length: { type: 'number', min: 0, max: 24000, tooltip: 'Maximum length (characters) of message context (excluding prompt) to use in generation' },
-            min_context_length: { type: 'number', min: 0, max: 24000, tooltip: 'The length (characters) to truncate the message context down to after chat_clear_time interval.' },
-            max_tokens: { type: 'number', min: 1, max: 4096, tooltip: 'Maximum number of tokens to generate in the model response.' },
-            temperature: { type: 'number', min: 0, max: 2, step: 0.1, tooltip: "Regulates randomness. Higher is more diverse. (0-2)" },
-            top_p: { type: 'number', min: 0, max: 1, step: 0.05, tooltip: "Filters token selection range based on probability." },
-            top_k: { type: 'number', min: 1, max: 100, tooltip: "Limits token selection to top k most probable tokens." },
-            frequency_penalty: { type: 'number', min: 0, max: 2, step: 0.1, tooltip: "Reduces token repetition based on frequency." },
-            presence_penalty: { type: 'number', min: 0, max: 2, step: 0.1, tooltip: "Reduces likelihood of a token if it has already appeared." },
-            n: { type: 'number', min: 1, max: 5, tooltip: "Number of responses to generate." },
-            stop: { type: 'array', itemType: 'text', tooltip: "Stop sequences for generation." },
-            reminder: { type: 'text', multiline: true, tooltip: 'Optional reminder text for the model.' }
+            min_context_length: { type: 'number', min: 0, max: 24000, tooltip: 'The length (characters) to truncate the message context down to after chat_clear_time interval. (This keeps the context warm and prevents certain bad responses, ie model saying \'I\'m new here\').' },
+            max_tokens: { type: 'number', min: 1, max: 4096, tooltip: 'Maximum number of tokens to generate in the model response. Below 100 tokens is recommended for short responses and to keep costs low' },
+            temperature: { type: 'number', min: 0, max: 2, step: 0.1, tooltip: "Regulates the randomness in token selection during text generation. Higher values means more diversity in token selection but setting it too high can result in gibberish outputs. (safe range from 0 to 1)" },
+            top_p: { type: 'number', min: 0, max: 1, step: 0.05, tooltip: "Filters token selection range based on probability. A value of 1 means all tokens in the vocabulary are considered for selection based on their probabilities. Lower values restrict selection to only the most likely tokens." },
+            top_k: { type: 'number', min: 1, max: 100, tooltip: "Limits token selection to only the top k most probable tokens at each generation step. With value 50, the model considers only the 50 highest probability tokens when deciding what to generate next, discarding all other possibilities." },
+            frequency_penalty: { type: 'number', min: 0, max: 2, step: 0.1, tooltip: "Reduces token repetition, scales up based on the number of times a token has occured the context" },
+            presence_penalty: { type: 'number', min: 0, max: 2, step: 0.1, tooltip: "Reduces the likelyhood a token will be selected if it has already occured in the context. (Unlike frequency penalty it only cares if the token has occured at all in the text, rather than the number of occurences)" },
+            n: { type: 'number', min: 1, max: 5, tooltip: "Number of responses (mainly for testing, wastes tokens in most cases)" },
+            stop: { type: 'array', itemType: 'text', tooltip: "List of tokens that will cause the generation to stop when reached. (You can leave this empty most of the time in chat models. But it can be very useful when using completion models. For example, you can set closing quotes as the stop token to get the model to finish the dialogue.)" },
+            reminder: { type: 'text', multiline: true, tooltip: 'Optional reminder text for the model. Recommended not to use for now' }
         },
         vision_settings: {
-            vision_enabled: { type: 'boolean', tooltip: 'Enable or disable vision for this bot.' },
+            vision_enabled: { type: 'boolean', tooltip: 'Vision Enabled or disabled for this bot' },
             vision_prompt: { type: 'text', multiline: true, tooltip: 'System prompt for vision requests. Define how the vision model should interpret images.' },
             provider: { type: 'text', hidden: true },
             endpoint: { type: 'text', hidden: true },
@@ -97,20 +97,21 @@ let settingsSchema = {
                     model: { type: 'select', options: {}, tooltip: "Backup vision model." }
                 }
             },
-            max_vision_queries_per_interval: { type: 'number', min: 0, tooltip: 'Max images read per vision limit interval.' },
-            vision_limit_interval: { type: 'number', min: 0, tooltip: 'Interval for vision query limits (seconds).' },
+            max_vision_queries_per_interval: { type: 'number', min: 0, tooltip: 'Max number of images that can be read per response limit interval' },
+            vision_limit_interval: { type: 'number', min: 0, tooltip: 'interval at which vision is in time our ot time limit' },
         },
         response_limits : {
-            response_limit_interval: { type: 'number', min: 0, tooltip: 'Rate limiting interval (seconds).' },
-            max_bot_response_count_per_interval: { type: 'number', min: 1, tooltip: 'Max bot responses in interval.' },
-            max_user_input_message_length: { type: 'number', min: 1, tooltip: 'Max user message length (characters).' },
-            chat_clear_time: { type: 'number', min: 0, tooltip: 'Time (seconds) before chat history truncation.' },
-            monitored_channels: { type: 'array', itemType: 'text', tooltip: 'Channel IDs bot reads/writes to.' },
-            partial_ignore_list: { type: 'array', itemType: 'text', tooltip: 'User/bot IDs bot reads but won\'t trigger response.' },
-            full_ignore_list: { type: 'array', itemType: 'text', tooltip: 'IDs bot ignores completely.' },
-            admins: { type: 'array', itemType: 'text', tooltip: 'User IDs that are administrators for this bot.' },
-            typing_delay_range: { type: 'range', min: 0, max: 60, tooltip: 'Typing effect delay range (seconds).' },
-            random_occurences_enabled: { type: 'boolean', tooltip: 'Bot can randomly respond in monitored channels.' },
+            response_limit_interval: { type: 'number', min: 0, tooltip: 'Time interval for rate limiting (seconds)' },
+            max_bot_response_count_per_interval: { type: 'number', min: 1, tooltip: 'Number of responses from the bot allowed within the response_limit_interval' },
+            max_user_input_message_length: { type: 'number', min: 1, tooltip: 'Maximum length of user messages (in characters)' },
+            chat_clear_time: { type: 'number', min: 0, tooltip: 'Time (seconds) before chat history is truncated (see min_context_length)' },
+            monitored_servers: { type: 'array', itemType: 'text', tooltip: 'Will ignore all messages not in this server (except for admin commands)' },
+            monitored_channels: { type: 'array', itemType: 'text', tooltip: 'Channel IDs that the bot can read and write to' },
+            partial_ignore_list: { type: 'array', itemType: 'text', tooltip: 'IDs of users or bots that the bot will read, but will not trigger a response' },
+            full_ignore_list: { type: 'array', itemType: 'text', tooltip: 'IDs that the bot will neither read nor respond to.' },
+            admins: { type: 'array', itemType: 'text', tooltip: 'User IDs that are administrators for this bot. Can use admin commands.' },
+            typing_delay_range: { type: 'range', min: 0, max: 60, tooltip: 'Random number within the range is selected and the bot will spend that much time tyiping to create a typing effect.' },
+            random_occurences_enabled: { type: 'boolean', tooltip: 'Bot can randomly pop up and respond in any channel. Bot will also respond when name is called. Regardless of monitored channels (but only in monitored servers)' },
         }
     }
 };
@@ -325,7 +326,7 @@ function ensureSettingsExist(modelName) {
             delete botData.vision_settings.vision_models;
         }
     }
-     if (botData.vision_settings.backup_models === undefined) {
+    if (botData.vision_settings.backup_models === undefined) {
         botData.vision_settings.backup_models = JSON.parse(JSON.stringify(defaultSettings.vision_settings.backup_models || []));
     } else if (!Array.isArray(botData.vision_settings.backup_models)) {
         botData.vision_settings.backup_models = JSON.parse(JSON.stringify(defaultSettings.vision_settings.backup_models || []));
@@ -761,7 +762,7 @@ function renderModelContent(modelName) {
             if (schemaForItem.type === 'array') {
                 formGroup.appendChild(createArrayInput(modelName, category, settingKey, settingValue || [], schemaForItem));
             } else if (schemaForItem.type === 'dictionary') {
-                 formGroup.appendChild(createDictionaryInput(modelName, category, settingKey, settingValue || {}, schemaForItem));
+                formGroup.appendChild(createDictionaryInput(modelName, category, settingKey, settingValue || {}, schemaForItem));
             } else if (schemaForItem.type === 'boolean') {
                 formGroup.appendChild(createBooleanInput(modelName, category, settingKey, !!settingValue, schemaForItem));
             } else if (schemaForItem.type === 'number') {
@@ -1007,34 +1008,69 @@ function createRangeInput(modelName, category, settingKey, settingValue, schema)
 }
 
 function createArrayInput(modelName, category, settingKey, currentArray, arraySchema) {
-    const container = document.createElement('div');
+    const fieldWrapper = document.createElement('div');
+    fieldWrapper.className = 'array-input-half-width';
+
     const fieldId = `${modelName}-${category}-${settingKey}`;
-    const labelContainer = document.createElement('div'); labelContainer.className = 'label-container';
-    const arrayLabel = document.createElement('label'); arrayLabel.setAttribute('for', fieldId); arrayLabel.textContent = formatSettingName(settingKey);
+
+    const labelContainer = document.createElement('div');
+    labelContainer.className = 'label-container';
+    const arrayLabel = document.createElement('label');
+    arrayLabel.setAttribute('for', fieldId + '-entries');
+    arrayLabel.textContent = formatSettingName(settingKey);
     labelContainer.appendChild(arrayLabel);
-    if (arraySchema && arraySchema.tooltip) { labelContainer.appendChild(createTooltip(arraySchema.tooltip)); }
-    container.appendChild(labelContainer);
+    if (arraySchema && arraySchema.tooltip) {
+        labelContainer.appendChild(createTooltip(arraySchema.tooltip));
+    }
+    fieldWrapper.appendChild(labelContainer);
+
+    const arrayInputBox = document.createElement('div');
+    arrayInputBox.className = 'array-input-box';
+
     const entriesContainerId = `${fieldId}-entries`;
-    const entriesContainer = document.createElement('div'); entriesContainer.id = entriesContainerId;
-    container.appendChild(entriesContainer);
-    const addButton = document.createElement('button'); addButton.className = 'add-entry'; addButton.textContent = '+ Add Entry';
-    addButton.onclick = function() { addArrayEntry(modelName, category, settingKey, arraySchema); };
-    container.appendChild(addButton);
+    const entriesContainer = document.createElement('div');
+    entriesContainer.id = entriesContainerId;
+
+    arrayInputBox.appendChild(entriesContainer);
+
+    const addButton = document.createElement('button');
+    addButton.className = 'add-entry';
+    addButton.textContent = '+ Add Entry';
+    addButton.onclick = function() {
+        addArrayEntry(modelName, category, settingKey, arraySchema);
+        setTimeout(() => {
+            if (entriesContainer.scrollHeight > entriesContainer.clientHeight) {
+                entriesContainer.scrollTop = entriesContainer.scrollHeight;
+            }
+        }, 0);
+    };
+    arrayInputBox.appendChild(addButton);
+
+    fieldWrapper.appendChild(arrayInputBox);
+
     function renderArrayEntries() {
         entriesContainer.innerHTML = '';
-        const actualArray = settings[modelName]?.[category]?.[settingKey] || [];
-        if (!Array.isArray(actualArray)) {
+        
+        if (!settings[modelName]) settings[modelName] = {};
+        if (!settings[modelName][category]) settings[modelName][category] = {};
+        if (!settings[modelName][category][settingKey] || !Array.isArray(settings[modelName][category][settingKey])) {
             settings[modelName][category][settingKey] = [];
         }
-        (settings[modelName][category][settingKey] || []).forEach((itemValue, index) => {
+        
+        const arrayToRender = settings[modelName][category][settingKey];
+
+        arrayToRender.forEach((itemValue, index) => {
             const entryDiv = createArrayEntryElement(modelName, category, settingKey, index, itemValue, arraySchema, renderArrayEntries);
             entriesContainer.appendChild(entryDiv);
         });
     }
+
     renderArrayEntries();
     entriesContainer.renderEntries = renderArrayEntries;
-    return container;
+
+    return fieldWrapper;
 }
+
 
 function createArrayEntryElement(modelName, category, settingKey, index, itemValue, arraySchema, rerenderCallback) {
     const entryDiv = document.createElement('div'); entryDiv.className = 'array-entry section';
@@ -1068,6 +1104,8 @@ function createArrayEntryElement(modelName, category, settingKey, index, itemVal
 }
 
 function addArrayEntry(modelName, category, settingKey, arraySchema) {
+    if (!settings[modelName]) settings[modelName] = {};
+    if (!settings[modelName][category]) settings[modelName][category] = {};
     if (!Array.isArray(settings[modelName][category][settingKey])) {
         settings[modelName][category][settingKey] = [];
     }
@@ -1095,28 +1133,33 @@ function addArrayEntry(modelName, category, settingKey, arraySchema) {
 }
 
 function createDictionaryInput(modelName, category, settingKey, currentValue, schema) {
-    const container = document.createElement('div');
+    const fieldWrapper = document.createElement('div');
+    fieldWrapper.className = 'input-field-container';
+
     const fieldId = `${modelName}-${category}-${settingKey}`;
 
     if (!(schema && schema.isSubComponent)) {
         const labelContainer = document.createElement('div');
         labelContainer.className = 'label-container';
         const dictLabel = document.createElement('label');
-        dictLabel.setAttribute('for', fieldId);
+        dictLabel.setAttribute('for', fieldId + '-entries'); 
         dictLabel.textContent = formatSettingName(settingKey);
         labelContainer.appendChild(dictLabel);
         if (schema && schema.tooltip) {
             labelContainer.appendChild(createTooltip(schema.tooltip));
         }
-        container.appendChild(labelContainer);
+        fieldWrapper.appendChild(labelContainer);
     }
+
+    const dictionaryInputBox = document.createElement('div');
+    dictionaryInputBox.className = 'dictionary-input-box'; 
 
     const entriesContainerId = `${fieldId}-entries`;
     const entriesContainer = document.createElement('div');
     entriesContainer.id = entriesContainerId;
-    entriesContainer.style.maxHeight = '300px';
+    entriesContainer.style.maxHeight = '450px';
     entriesContainer.style.overflowY = 'auto';
-    container.appendChild(entriesContainer);
+    dictionaryInputBox.appendChild(entriesContainer);
 
     const addButton = document.createElement('button');
     addButton.className = 'add-entry';
@@ -1129,13 +1172,21 @@ function createDictionaryInput(modelName, category, settingKey, currentValue, sc
             }
         }, 0);
     };
-    container.appendChild(addButton);
+    dictionaryInputBox.appendChild(addButton);
+    
+    fieldWrapper.appendChild(dictionaryInputBox);
 
     function renderDictEntries() {
         let dictToRender = settings[modelName]?.[category]?.[settingKey];
         if (typeof dictToRender !== 'object' || dictToRender === null) {
             dictToRender = {};
-            settings[modelName][category][settingKey] = dictToRender;
+            if (settings[modelName] && settings[modelName][category]) {
+                 settings[modelName][category][settingKey] = dictToRender;
+            } else {
+                if(!settings[modelName]) settings[modelName] = {};
+                if(!settings[modelName][category]) settings[modelName][category] = {};
+                settings[modelName][category][settingKey] = dictToRender;
+            }
         }
 
         const keyOrder = [];
@@ -1160,7 +1211,7 @@ function createDictionaryInput(modelName, category, settingKey, currentValue, sc
     }
     renderDictEntries();
     entriesContainer.renderEntries = renderDictEntries;
-    return container;
+    return fieldWrapper;
 }
 
 function createDictionaryEntryElement(modelName, category, settingKey, dictKey, dictValue, rerenderCallback) {
@@ -1189,9 +1240,9 @@ function createDictionaryEntryElement(modelName, category, settingKey, dictKey, 
 
         for(const original_dict_key in currentDict){
             if (!newOrderedDict.hasOwnProperty(original_dict_key) && original_dict_key !== oldKey) {
-                 newOrderedDict[original_dict_key] = currentDict[original_dict_key];
+                newOrderedDict[original_dict_key] = currentDict[original_dict_key];
             } else if (original_dict_key === oldKey && !newOrderedDict.hasOwnProperty(newKey) ) {
-                 newOrderedDict[newKey] = currentDict[oldKey];
+                newOrderedDict[newKey] = currentDict[oldKey];
             }
         }
         settings[modelName][category][settingKey] = newOrderedDict;

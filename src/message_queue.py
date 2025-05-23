@@ -1,6 +1,6 @@
 #%%
-
 from collections import deque
+from serialization_definitions import Message, Role
 
 '''
 
@@ -12,30 +12,6 @@ ALSO this only truncates message context, not prompt context.
 
 
 '''
-
-
-class Role:
-    system = "system"
-    event = "# NOTIFICATION: "
-    user = "user"
-    assistant = "assistant"
-
-class Message:
-    def __init__(self, role: str, message: str, name: str = ""):
-        self.role: str = role
-        self.content: str = message
-        self.name: str = name
-        
-    def serialize_usermessage(self):
-        if self.role == Role.event:
-            return self.name + self.content
-        elif len(self.name) > 0 and self.role != Role.assistant:
-            return "<" + self.name + ">: " + self.content
-        else:
-            return self.content
-    
-    def to_dict(self):
-        return {"role": self.role, "content": self.serialize_usermessage()}
 
 class MessageQueue:
     def __init__(self, max_len, min_len):
@@ -114,6 +90,3 @@ class MessageQueue:
         
     def __iter__(self):
         return iter(self.queue)
-
-if __name__ == "__main__":
-    q = MessageQueue(1000)

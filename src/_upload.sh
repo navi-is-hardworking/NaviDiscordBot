@@ -2,6 +2,9 @@
 
 #!/bin/bash
 
+# Comment out this line... this is mine 
+source /c/Users/cbrow/crbw/Git/bash_environment/bashrc
+
 # Hey. You made it here. Noice
 # Replace these two with your key and ip addres for you aws
 KEY_FILE_LOCATION=~/.ssh/my-ec2-key.pem

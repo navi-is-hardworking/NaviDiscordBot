@@ -40,6 +40,10 @@
     * [Clone or Download the Repo](#clone-repo)
 - [Set .env File](#bot-token-in-env)
 - [Run The Bot](#run-the-bot)
+- [Run On Cloud](#run-on-cloud)
+    * [1. Making AWS Instance](#make-aws)
+    * [2. Docker](#docker)
+    * [2.5 No Docker](#no-docker)
 - [Configuration Notes](#configuration-notes)
 - [TLDR](#tldr)
 
@@ -238,11 +242,79 @@ cd src
 python bot.py setting/settings.json
 ```
 
-### To run on aws (requires Docker) (configure paths in _upload.sh)
+<a id="run-on-cloud"></a>
+<h1 style="font-size: 32px;
+    margin-top: 0.5em;
+    margin-bottom: 0.5em;
+    line-height: 1.1;"
+    align="center">To The Cloud!</>
+
+<a id="make-aws"></a>
+## https://aws.amazon.com
+    
+<img src="./images/create-aws.png" alt="alt text" style="width:auto;height:auto;">
+<img src="./images/aws-ec2.png" alt="alt text" style="width:auto;height:auto;">
+<img src="./images/ec2-micro.png" alt="alt text" style="width:auto;height:auto;">
+<img src="./images/make-key.png" alt="alt text" style="width:auto;height:auto;">
+<img src="./images/rsa-pem.png" alt="alt text" style="width:auto;height:auto;">
+<img src="./images/aws-traffic.png" alt="alt text" style="width:auto;height:auto;">
+<img src="./images/launch-instance.png" alt="alt text" style="width:auto;height:auto;">
+<img src="./images/open-instance.png" alt="alt text" style="width:auto;height:auto;">
+<img src="./images/launch-connect.png" alt="alt text" style="width:auto;height:auto;">
+<img src="./images/connecting.png" alt="alt text" style="width:auto;height:auto;">
+
+if you made it here you are doing good.
+```
+ls // should be empty at this point
+```
+<img src="./images/inside-instance.png" alt="alt text" style="width:auto;height:auto;">
+
+<a id="docker"></a>
+### To run with Docker, you need to install docker first on local machine and aws server then open _upload.sh and replace 
+
+<img src="./images/upload-config.png" alt="alt text" style="width:auto;height:auto;">
+
+### then run...
+
 ```
 ./_upload.sh
 ```
 
+<a id="no-docker"></a>
+## Run without docker enter your aws instance
+
+```
+git clone https://github.com/navi-is-hardworking/NaviDiscordBot
+```
+
+## then from your local machine ( after you have made your settings.json file )
+
+```
+scp -i /path/to/your-key.pem src/settings/settings.json username@ip-address
+
+#example
+scp -i ~/.ssh/my-ec2-key.pem src/settings/settings.json ec2-user@33.123.24.22:/home/ec2-user/NaviDiscordBot/src/settings
+```
+## After uploading your settings enter your aws instance and double check
+
+```
+tail -500 /home/ec2-user/NaviDiscordBot/src/settings/settings.json
+```
+## if it looks good you can try running
+
+```
+cd /home/ec2-user/NaviDiscordBot
+sudo yum update -y
+sudo yum install python3 -y
+sudo yum install python3-pip -y
+python3 --version
+pip3 --version
+python3 -m venv botenv
+source botenv/bin/activate
+pip install discord.py aiohttp python-dotenv json5 httpx dotenv
+cd src
+python3 bot.py
+```
 
 <a id="configuration-notes"></a>
 <h1 style="font-size: 32px;

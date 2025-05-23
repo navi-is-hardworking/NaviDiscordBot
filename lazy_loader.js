@@ -7,29 +7,21 @@ let uiInitTime = 0;
 const PASSWORD_ENTRY_GRACE_PERIOD = 3000;
 
 const visionOptions = {
-    "TogetherAI": {
-        "https://api.together.xyz/v1/chat/completions": {
-            "Llama-Vision-Free": "meta-llama/Llama-Vision-Free",
-        }
-    },
     "Fireworks": {
         "https://api.fireworks.ai/inference/v1/chat/completions": {
             "Llama-4 Scout V": "accounts/fireworks/models/llama4-scout-instruct-basic",
             "Llama-4 Maverick V": "accounts/fireworks/models/llama4-maverick-instruct-basic",
             "Qwen-2.5 32B V": "accounts/fireworks/models/qwen2p5-vl-32b-instruct",
         }
+    },
+    "TogetherAI": {
+        "https://api.together.xyz/v1/chat/completions": {
+            "Llama-Vision-Free": "meta-llama/Llama-Vision-Free",
+        }
     }
 };
 
 const modelOptions = {
-    "TogetherAI": {
-        "https://api.together.xyz/v1/chat/completions": {
-            "Llama-3.3 70B Free": "meta-llama/Llama-3.3-70B-Instruct-Turbo-Free",
-            "Llama-Vision-Free": "meta-llama/Llama-Vision-Free",
-            "Deepseek Free": "deepseek-ai/DeepSeek-R1-Distill-Llama-70B-free",
-            "Llama-3.3 70B": "meta-llama/Llama-3.3-70B-Instruct-Turbo",
-        }
-    },
     "Fireworks": {
         "https://api.fireworks.ai/inference/v1/chat/completions": {
             "Llama-3.1 8B": "accounts/fireworks/models/llama-v3p1-8b-instruct",
@@ -41,6 +33,14 @@ const modelOptions = {
             "Qwen-2.5 32B V": "accounts/fireworks/models/qwen2p5-vl-32b-instruct",
             "Qwen-3 30B": "accounts/fireworks/models/qwen3-30b-a3b",
             "Qwen-3 235B": "accounts/fireworks/models/qwen3-235b-a22b",
+        }
+    },
+    "TogetherAI": {
+        "https://api.together.xyz/v1/chat/completions": {
+            "Llama-3.3 70B Free": "meta-llama/Llama-3.3-70B-Instruct-Turbo-Free",
+            "Llama-Vision-Free": "meta-llama/Llama-Vision-Free",
+            "Deepseek Free": "deepseek-ai/DeepSeek-R1-Distill-Llama-70B-free",
+            "Llama-3.3 70B": "meta-llama/Llama-3.3-70B-Instruct-Turbo",
         }
     }
 };

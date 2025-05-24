@@ -19,17 +19,21 @@ class CompletionGenerator:
         if self.providers == None:
             self.providers = []
         
-        if primairy_provider:
-            self.providers.insert(0, primairy_provider)
         
-        custom_url = os.environ.get('CUSTOM_COMPLETION_URL', None)
-        custom_model = os.environ.get('CUSTOM_COMPLETION_MODEL', None)
-        custom_key = os.environ.get('CUSTOM_COMPLETION_KEY', None)
+        custom_url = os.environ.get("CUSTOM_COMPLETION_URL", None)
+        custom_model = os.environ.get("CUSTOM_COMPLETION_MODEL", None)
+        custom_key = os.environ.get("CUSTOM_COMPLETION_KEY", None)
         
         if custom_url and custom_model and custom_key:
+            custom_url = custom_url.strip('\'"')
+            custom_model = custom_model.strip('\'"')
+            custom_key = custom_key.strip('\'"')
+            
             custom_provider = LLM_Provider(endpoint=custom_url, model=custom_model, provider="Fireworks")
             custom_provider.api_key = custom_key
             self.providers.insert(0, custom_provider)
+        elif primairy_provider:
+            self.providers.insert(0, primairy_provider)
         
         
         
@@ -41,7 +45,7 @@ class CompletionGenerator:
             
         provider = self.providers[provider_index]
         if provider_index > 0:
-            log.debug(f"retrying image generation with {provider.endpoint}, {provider.model}")
+            log.debug(f"retrying completion generation with {provider.endpoint}, {provider.model}")
             
         payload['model'] = provider.model
             
@@ -51,17 +55,19 @@ class CompletionGenerator:
             "Authorization": f"Bearer {provider.api_key}"
         }
         
-        async with aiohttp.ClientSession() as session:
-            async with session.post(provider.endpoint, json=payload, headers=headers, timeout=timeout) as response:
-                try: 
-                    response_data = await response.text()
-                    # log.debug(response_data)
-                    response_json: dict = json.loads(response_data)
-                    error = response_json.get("error", None)
-                    if error:
-                        log.error(f"error getting completion from {provider.endpoint}: {provider.model}... {response_data}")
-                        return await self.fetch_completion(payload=payload, provider_index=provider_index+1)
-                    else:
-                        return response_json
-                except Exception as e:
-                    log.error(f"failed to get completion generation: {e}, {response_data}")
+        try: 
+            async with aiohttp.ClientSession() as session:
+                async with session.post(provider.endpoint, json=payload, headers=headers, timeout=timeout) as response:
+                        response_data = await response.text()
+                        log.debug("recieved completion response")
+                        # log.debug(response_data)
+                        response_json: dict = json.loads(response_data)
+                        error = response_json.get("error", None)
+                        if error:
+                            log.error(f"error getting completion from {provider.endpoint}: {provider.model}... {response_data}")
+                            return await self.fetch_completion(payload=payload, provider_index=provider_index+1)
+                        else:
+                            return response_json
+        except Exception as e:
+            log.error(f"failed to get completion generation: {provider.endpoint, provider.model}")
+            return await self.fetch_completion(payload=payload, provider_index=provider_index+1)

@@ -52,10 +52,10 @@ let settingsSchema = {
         prompt_settings: {
             prompt_head: { type: 'text', multiline: true, tooltip: 'The main part of the prompt. Add style guidelines and Character definition here.' },
             dictionary_cache_header: { type: 'text', multiline: true, tooltip: '(Optional) Header text for the dictionary_cache section. Tell the bot what the dictionary_cache means. ie. # Memories, # Notes:, # Response examples... etc...' },
-            dictionary_cache: { type: 'dictionary', tooltip: 'Mini Rag generation for model knowledge. Keywords separated by spaces will retrieve the memory.' },
+            dictionary_cache: { type: 'dictionary', tooltip: 'Mini Rag generation for model knowledge. Keywords separated by spaces will retrieve the memory. You can set tons of these to increase the diverity and knowledge of the bots responses. Make sure all the keys are unique and have no special characters. If you find a item popping up too often, try reducing the keyword scope. For example if you set an entry like: key-> like | item-> You like to eat pancakes, Then its likely this item will get stuck in their memory very frequently. You can change it to key-> pancake pancakes | item-> You like to eat pancakes, and this will make it show up only when pancake or pancakes is mentioned.' },
             cache_capacity: { type: 'number', min: 1, max: 20, tooltip: 'Max number of messages to keep in cache' },
-            cache_clear_time: { type: 'number', min: 0, tooltip: 'The amount of time (second) an item can exist in the cache without being triggered before it is removed.' },
-            prompt_tail: { type: 'text', multiline: true, tooltip: '(Optional) Final note for the model. Example: You are chatting in a discord server' },
+            cache_clear_time: { type: 'number', min: 0, tooltip: 'The amount of time (second) an item can exist in the cache without being triggered before it is removed. Reducing this can lower AI fixating on a single topic as long as the keyword is not being mentioned repeatedly. Set it too low, though, and it might leave the context before the AI gets a chance to respond.' },
+            prompt_tail: { type: 'text', multiline: true, tooltip: '(Optional) Final note for the model. Example: You are chatting in a discord server. You can set /no_think here for Qwen think models too.' },
         },
         llm_settings: {
             provider: { type: 'text', hidden: true },

@@ -45,7 +45,13 @@
     * [2. Docker](#docker)
     * [2.5 No Docker](#no-docker)
 - [Configuration Notes](#configuration-notes)
+    * [Parameters](#param-notes)
+    * [Models](#model-notes)
+    * [Custom-Models](#custom-model-notes)
+    * [Free-Models](#free-model-notes)
+    * [Backup-Models](#backup-model-notes)
 - [TLDR](#tldr)
+- [Other Notes](#other-notes)
 
 
 </div>
@@ -323,7 +329,11 @@ python3 bot.py
     line-height: 1.1;"
     align="center">Configuration Notes</h1>
 
-## ** LLM Model parameters
+<a id="param-notes"></a>
+
+### See the UI tooltips for more robust notes. I will probably updating there instead of here.
+
+## LLM Model parameters
 
 ```    
 max_tokens                -> The maximum length of the models response. 1 token is roughly 4 letters/characters
@@ -345,12 +355,14 @@ prompt_tail               -> instructions for the model
 dictionary_cache          -> Would normally be vdb but just using simple dictionary for important memories so it can run on aws micro
 cache_capacity            -> number of cached memories that can be stored at once
 cache_clear_time          -> max duration a memory will exist in context before being removed
-reminder                  -> experemental: does not work well on some models. Appends to end of context before sending.
+reminder                  -> experemental: does not work well on some models. Appends to end of context before sending. If you are using a reason model that supports /no_reason like Qwen, you can have it so /no_reason is append at the end of every message (should also set /no_reason im prompt too)
 
 ```
 
 <a id="bot-configurations"></a>
-## ** Bot Configurations
+
+## Bot Configurations
+
 
 ```
 max_user_input_message_length        -> will truncate user messages that are too long
@@ -361,6 +373,41 @@ channels                             -> channels that it will respond
 ignore_names                         -> names to ignore (like other bots)
 response_delay_range                 -> Bot will pick a random number in range and respond after typing for that amount of time
 ```
+
+<a id="model-notes"></a>
+
+## Currently I have two providers set up and some of the models added
+<img src="./images/model-notes.png" alt="alt text" style="width:auto;height:auto;">
+
+<a id="custom-model-notes"></a>
+
+# Custom Models
+### If you have a fine tuned model or want to set a custom provider you can modify the .env file manually. This will override your primary provider
+```
+CUSTOM_COMPLETION_URL=
+CUSTOM_COMPLETION_MODEL=
+CUSTOM_COMPLETION_KEY=
+```
+
+<a id="free-model-notes"></a>
+
+# Free Models
+### TogetherAI offers a selection of free models with reduced rates, 6 Free requests per minute (Although based on my testing it seems to be a lot less than that, maybe 3-4, at uneven intervals)
+<img src="./images/free-models.png" alt="alt text" style="width:auto;height:auto;">
+
+
+<a id="backup-model-notes"></a>
+
+# If the free model rates are too low, or one of the models is unstable, you can set backup models
+### Setting the free TogetherAI model as primary and a cheap Fireworks model as backup means it will try to use free first, if that fails, it will try again on backup.
+### This helps keep the quality high and the cost very low.
+### If you don't set a backup then you can use it for free albeit with very low usasge rates
+
+<img src="./images/backup-models.png" alt="alt text" style="width:auto;height:auto;">
+
+
+
+
 
 <a id="tldr"></a>
 
@@ -379,6 +426,19 @@ response_delay_range                 -> Bot will pick a random number in range a
 - Nested rag for conditional searches
 - User based rag
 - Banned phrases list
+
+
+<a id="other-notes"></a>
+
+# Other notes
+
+* Currently hard codes removal of reason in Qwen models by removing all text between <reason> </reason> I will add a option to remove it in the future
+* I plan on finding more providers that offer free models so that free tier can be expanded
+* When pulling, ALWAYS backup your settings.json. I make frequent changes to formatting and you could lose your settings when running the run.bat
+* The lazy UI components are all "vibe" coded. They are very unstable. You should only use them to make your settings.json. When running the model over the long term, always run via bot.py directly or through docker
+* Lazy UI component sometimes fails to kill the bot after starting resulting in hanging process. You will have to kill manually through task manager or get pid through ps aux
+* Model name needs to have no spaces in it. It is only used to set the API key and for calling via the random_occurrences (which I will rename to properly reflect how it just means the bot can respond serverwide as long as its name is mentioned)
+
 
 
 

@@ -42,7 +42,7 @@ class PromptManager:
         
         
     def search(self, message: str, username: str, database: TLRUCache):
-        log.debug(f"searching")
+        # log.debug(f"searching")
         if (not self.prompt_dictionary):
             log.warning("no prompt_dictionary found")
             return

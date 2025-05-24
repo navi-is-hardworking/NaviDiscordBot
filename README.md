@@ -373,6 +373,14 @@ response_delay_range                 -> Bot will pick a random number in range a
 5. Run bot
 
 
+# TODO:
+- Give better example on how to use the dictionary rag
+- Add rag cooldown to items
+- Nested rag for conditional searches
+- User based rag
+- Banned phrases list
+
+
 
 
 

@@ -7,7 +7,7 @@ from completion_generator import CompletionGenerator
 from provider_settings import LLM_Provider
 from discord_bot import DiscordBot
 from logger import log
-
+from rate_limit import RateLimit
 
 
 def parse_json(json_path) -> dict:
@@ -28,12 +28,7 @@ def create_bot_list(settings_file_path: str) -> list[DiscordBot]:
         
         
         bot_token_location = settings["bot_token"]
-        ## I regret everything
         response_limits = settings['response_limits']
-        response_limits["max_vision_queries_per_interval"]=settings["vision_settings"]["max_vision_queries_per_interval"]
-        response_limits["vision_limit_interval"]=settings["vision_settings"]["vision_limit_interval"]
-        print(response_limits["vision_limit_interval"],"  ",response_limits["max_vision_queries_per_interval"])
-        
         discord_bot = DiscordBot(bot_name=char_name, bot_token_location=bot_token_location, setting_dictionary=response_limits, chat=chat)
         bots.append(discord_bot)
         log.debug(f"initialized {char_name}")
@@ -43,6 +38,7 @@ def create_bot_list(settings_file_path: str) -> list[DiscordBot]:
 
 def create_llm(char_name: str, settings: dict):
         
+        limit_settings: dict = settings["response_limits"]
         prompt_settings: dict = settings["prompt_settings"]
         vision_settings: dict = settings["vision_settings"]
         llm_settings: dict = settings["llm_settings"]
@@ -84,11 +80,23 @@ def create_llm(char_name: str, settings: dict):
             configuration_dict=llm_settings
         )
         
+        context_rate_limiter = RateLimit(
+            limit_settings['max_bot_response_count_per_interval'],
+            limit_settings['response_limit_interval']
+        )
+        
+        vision_rate_limiter = RateLimit(
+            vision_settings['max_vision_queries_per_interval'],
+            vision_settings['vision_limit_interval']
+        )
+        
         chat = chat_manager(
             char_name=char_name,
             completion_client=completion_client,
             vision_client=vision_client,
             params=parameters,
+            context_rate_limiter=context_rate_limiter,
+            vision_rate_limiter=vision_rate_limiter
         )
         
         return chat

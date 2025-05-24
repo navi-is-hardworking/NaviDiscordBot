@@ -5,16 +5,28 @@ from dotenv import load_dotenv
 from completion_generator import CompletionGenerator
 from vision_processor import VisionProcessor
 from logger import log
+from rate_limit import RateLimit
 
 load_dotenv()
 
 class chat_manager:
-    def __init__(self, char_name: str, completion_client: CompletionGenerator, vision_client: VisionProcessor, params: Parameters):
+    def __init__(
+        self,
+        char_name: str,
+        completion_client: CompletionGenerator,
+        vision_client: VisionProcessor,
+        params: Parameters,
+        context_rate_limiter: RateLimit,
+        vision_rate_limiter: RateLimit,
+    ):
         
         self.char_name = char_name
         self.Params: Parameters = params
         self.client: CompletionGenerator = completion_client
         self.vision_client: VisionProcessor = vision_client
+        self.context_rate_limiter: RateLimit = context_rate_limiter
+        self.vision_rate_limiter: RateLimit = vision_rate_limiter
+        
         
         self.input_tokens = 0
         self.output_tokens = 0
@@ -100,6 +112,11 @@ class chat_manager:
     
     
     async def _get_completion(self, context) -> str:
+        if self.context_rate_limiter.full():
+            log.warning(f"_get_completion canceled due to exceeding user set rate limit")
+            return ""
+        self.context_rate_limiter.add()
+        
         message = ""
         request = {}
         try:
@@ -133,6 +150,8 @@ class chat_manager:
     async def generate_response(self) -> str:
         context = self.Params.to_dict()
         message, input_used, output_used = await self._get_completion(context)
+        if not message:
+            return ""
         
         self.input_tokens += input_used
         self.output_tokens += output_used
@@ -141,7 +160,15 @@ class chat_manager:
             
         return message
         
+    def can_receive_vision_request(self) -> bool:
+        return not self.vision_rate_limiter.full()
+    
     async def generate_image_to_text(self, image_url) -> str:
+        if self.vision_rate_limiter.full():
+            log.warning(f"generate_image_to_text canceled due to exceeding user set rate limit")
+            return
+        self.vision_rate_limiter.add()
+        
         try:
             (image_text, prompt_tokens, completion_tokens) = await self.vision_client.read_image(image_url)
             self.input_tokens += prompt_tokens

@@ -4,7 +4,6 @@ import discord
 from discord.ext import commands
 from discord_llama import chat_manager
 import asyncio
-from rate_limit import RateLimit
 import random
 import threading
 from collections import deque
@@ -13,6 +12,8 @@ from shared_image_cache import image_cache
 from logger import log
 import random
 from message_queue import MessageQueue, Role, Message
+import os
+import sys
 
 from typing import (
     Union,
@@ -36,16 +37,6 @@ class DiscordBot:
         
         self.typing_delay_range = setting_dictionary['typing_delay_range']
         
-        self.context_rate_limiter = RateLimit(
-            setting_dictionary['max_bot_response_count_per_interval'],
-            setting_dictionary['response_limit_interval']
-        )
-        
-        self.vision_rate_limiter = RateLimit(
-            setting_dictionary['max_vision_queries_per_interval'],
-            setting_dictionary['vision_limit_interval']
-        )
-        
         self.bot_name = bot_name
         self.intents: discord.Intents = discord.Intents.default()
         self.intents.message_content = True
@@ -59,8 +50,11 @@ class DiscordBot:
         self.last_message_time = -self.chat_clear_time - 1
         self.message_queue: deque[discord.Message] = deque()
         
+        self.sleeping = False
+        
         log.debug(f"Discord bot {bot_name} initialized.")
         
+    
     
     def add_message_to_context(self, user_name: str, msg: str):
         if (len(msg) > self.max_user_input_message_length):
@@ -69,8 +63,9 @@ class DiscordBot:
         self.chat.add_user_message(msg, user_name)
     
     
+    
     async def process_message_queue(self, channel):
-        while not self.context_rate_limiter.full() and len(self.message_queue) > 0 and self.processing_lock.acquire(blocking=False):
+        while len(self.message_queue) > 0 and self.processing_lock.acquire(blocking=False):
             try:
                 await self.wait_process_response(channel)
             except Exception as e:
@@ -78,6 +73,7 @@ class DiscordBot:
             finally:
                 self.processing_lock.release()
             
+    
     
     async def wait_process_response(self, channel):
         async with channel.typing():
@@ -103,17 +99,19 @@ class DiscordBot:
             log.debug(f"{self.bot_name}: FULL elapsed time: {time.time() - start_time}")
             
     
+    
     async def calculate_wait_time(self):
         delay = random.uniform(self.typing_delay_range[0], self.typing_delay_range[1])
         await asyncio.sleep(delay)
     
     
+    
     def prepare_context(self):
+        # TODO: move into the chat instead of here
         if (time.time() - self.last_message_time > self.chat_clear_time):
             log.debug(f"{self.bot_name}: clearing chat history")
             self.chat.truncate_memory()
                 
-        self.context_rate_limiter.add()
         self.last_message_time = time.time()
         
         response_targets = set()
@@ -123,10 +121,12 @@ class DiscordBot:
             response_targets.add(message.channel)
             
         return response_targets
+        
     
     
     async def on_ready(self):
         log.info(f'{self.bot.user} has connected to Discord!')
+        
     
     
     async def start(self):
@@ -138,15 +138,17 @@ class DiscordBot:
         await self.bot.start(token)
         
     
+    
     def get_context(self):
         return self.chat.get_context()
+        
     
     
     async def handle_image_processing(self, message: discord.Message):
-        if len(message.attachments) == 0 or self.vision_rate_limiter.full():
+        if len(message.attachments) == 0 and self.chat.can_receive_vision_request():
             return 
-        log.info(f"Attempting to proccess images {message.attachments}")
             
+        log.info(f"Attempting to proccess images {message.attachments}")
         if self.chat.is_vision_enabled():
             image_texts = f"\n# {message.author.display_name} attachments:\n"
             images_found = False
@@ -167,30 +169,31 @@ class DiscordBot:
             log.info(f"final content: {message.content}")
         else:
             log.warning("tried to process image but imaging was not enabled")
-    
-    
-    def handle_random_occurance(self, message: discord.Message) -> bool:
-        if not self.random_occurences_enabled:
-                return True
-        if self.bot_name.lower() in message.content.lower():
-            return False
-        elif (time.time() - self.last_message_time > self.chat_clear_time):
-            if random.randint(0, 20): # % 5 chance
-                return True
-        elif random.randint(0, 50): # %2 chance
-            return True
-    
+
+
+
     
     async def handle_admin_command(self, message: discord.Message):
         args = message.content.split(" ")
         command = args[0]
+        print(f"processing command {args}")
         log.debug(f"processing command {args}")
-        if command == "!reset":
-            self.chat.clear_memory()
         
+        if command == "!wake":
+            self.sleeping = False
+        elif command == "!sleep":
+            self.sleeping = True
+        elif command == "!kill":
+            sys.exit()
+        elif command == "!reset":
+            log.debug(f"resetting")
+            sys.stdout.flush()
+            sys.stderr.flush()
+            os.execv(sys.executable, ['python'] + sys.argv)
+        elif command == "!clear":
+            self.chat.clear_memory()
         elif command == "!context":
             full_context = self.chat._get_chat()
-            
             await message.author.send(f"model: {full_context['model']}")
             await message.author.send(f"max_tokens: {full_context['max_tokens']}")
             await message.author.send(f"temperature: {full_context['temperature']}")
@@ -201,20 +204,21 @@ class DiscordBot:
             await message.author.send(f"n: {full_context['n']}")
             await message.author.send(f"stream: {full_context['stream']}")
             await message.author.send(f"stop: {full_context['stop']}")
-        
         elif command == "!rates":
             rates_string: str = self.chat._get_rates()
             await message.author.send("!" + rates_string)
-        
         return
+    
     
     
     async def send_to_user(self, author: Union[discord.User, discord.Member], message: str):
         await author.send(message)
+        
     
     
     async def get_channel(self, channel_id: discord.abc.Messageable):
         return self.bot.get_channel(channel_id)
+        
         
     
     async def get_messages(self, channel: Union[discord.TextChannel, discord.Thread, discord.VoiceChannel, discord.StageChannel]) -> list[discord.Message]:
@@ -223,7 +227,8 @@ class DiscordBot:
             past_messages.append(past_msg)
         return past_messages
 
-            
+
+
     async def send_oneshot_message(self, message: discord.Message):
         async with message.channel.typing():
             log.debug("trying to get messages")
@@ -245,44 +250,61 @@ class DiscordBot:
             response = await self.chat.get_oneshot_response(msgs)
             log.debug(f"oneshot response: {response}")
             await message.channel.send(response)
-            await self.bot.process_commands(message)
+            # await self.bot.process_commands(message)
     
+    
+    
+    def can_respond(self, message: discord.Message):
+        if not message.guild:
+            return False
+        
+        ## TODO: make this readable
+        # in_valid_server = message.guild and self.monitored_servers and message.guild.id in self.monitored_servers
+        # is_valid_message = len(message.content) == 0 and len(message.attachments) == 0
+        # is_from_valid_user = not (message.author == self.bot.user or message.author.id in self.full_ignore_list)
+        
+        if self.sleeping:
+            return False
+        
+        if len(message.content) == 0 and len(message.attachments) == 0:
+            return False
             
+        if message.author == self.bot.user or message.author.id in self.full_ignore_list:
+            return False
+        
+        if message.channel.id in self.monitored_channels:
+            return True
+        
+        if self.monitored_servers and message.guild.id in self.monitored_servers:
+            return True
+            
+        return False
+    
+    
+    
     ######## Where messages comes in / main logic ########
     async def on_message(self, message: discord.Message):
         
-        ## Process admin commands
-        if self.admin_list and message.author.id in self.admin_list and not message.content.find("!"):
-            # todo handle command
-            await self.handle_admin_command(message)
+        ## never respond to !, but it could be an admin command
+        if not message.content.find("!"):
+            if self.admin_list and message.author.id in self.admin_list:
+                await self.handle_admin_command(message)
             return
             
-        ## Don't respond process disabled channels
-        if self.monitored_servers and message.guild:
-            if message.guild.id not in self.monitored_servers:
-                return
-            
-        ## Ignore the dup responses which will have ! at the start or be an admin command
-        if message.author == self.bot.user or message.author.id in self.full_ignore_list or not message.content.find("!"):
+        ## checks rate limit, in channel or server, has message, in guild...
+        if not self.can_respond(message):
             return
         
+        if message.channel.id not in self.monitored_channels and message.author.id not in self.partial_ignore_list:
+            if not self.random_occurences_enabled:
+                return
+            if self.bot_name.lower() in message.content.lower():
+                await self.send_oneshot_message(message)
+            return
+        
+        ## monitored channel maintains a running context
         if (message.author.id in self.partial_ignore_list):
             self.add_message_to_context(message.author.display_name, message.content)
-            return
-                
-        if self.context_rate_limiter.full():
-            return
-            
-        ## Random changes to respond anywhere, need to create a oneshot context
-        if message.channel.id not in self.monitored_channels:
-            log.debug("not in monitored channels")
-            if self.handle_random_occurance(message):
-                return
-            else:
-                await self.send_oneshot_message(message)
-                return
-        
-        if len(message.content) == 0 and len(message.attachments) == 0:
             return
         
         await self.handle_image_processing(message)
@@ -294,5 +316,5 @@ class DiscordBot:
         self.message_queue.append(message)
         
         await self.process_message_queue(message.channel)
-        await self.bot.process_commands(message)
+        # await self.bot.process_commands(message)
         

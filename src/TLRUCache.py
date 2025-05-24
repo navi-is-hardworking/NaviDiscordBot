@@ -38,6 +38,8 @@ class TLRUCache:
             self.cache.popitem(last=False)
     
     def as_string(self):
+        if not self.cache:
+            return ""
         if (self.cache_clear_time != None):
             self.prune_expired_keys()
         return "\n".join([k for k, v in self.cache.items()])

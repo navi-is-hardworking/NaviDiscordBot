@@ -7,8 +7,8 @@ source /c/Users/cbrow/crbw/Git/bash_environment/bashrc
 
 # Hey. You made it here. Noice
 # Replace these two with your key and ip addres for you aws
-KEY_FILE_LOCATION=~/.ssh/my-ec2-key.pem
-AWS_ADDRESS="42.069.123"
+# KEY_FILE_LOCATION=~/.ssh/my-ec2-key.pem
+# AWS_ADDRESS="42.069.123"
 
 
 # Build Docker image

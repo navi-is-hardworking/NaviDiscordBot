@@ -1,3 +1,15 @@
+'''
+WARNING: AI Slop UI component
+
+All #Lazy components are build primarily via gaslight dueling vs AI 
+Exists mainly to help users create a settings.json
+Once you get your settings.json and .env, look it over to make sure its correct cause this is some jank. 
+You can run the bot from this UI for quick testing but it is better to just run from src/bot.py directly or docker.
+To keep the bot running 24/7 you will need to keep your pc on 24/7 or run from cloud service -> see _upload.sh 
+
+ALSO WARNING IF YOU USE THIS TO RUN BOT AND THIS IS STOPPED ABRUTLY IT MIGHT NOT CLOSE BOT.PY SO THEN IT WILL BE HANGING FOREVER! YOU WILL HAVE TO CLOSE THROUGH TASK MANAGERjo
+'''
+
 import http.server
 import socketserver
 import json
@@ -11,7 +23,7 @@ import subprocess
 import signal
 import time
 from urllib.parse import urlparse, parse_qs
-from queue import Queue, Empty # For thread-safe communication
+from queue import Queue, Empty
 
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
 logger = logging.getLogger("SettingsServer")
@@ -46,16 +58,15 @@ if not os.path.exists(SETTINGS_PATH):
 def stream_reader_thread_func(stream, queue, stream_name_tag):
     try:
         for line in iter(stream.readline, ''):
-            if line: # Ensure line is not empty
+            if line:
                 queue.put((stream_name_tag, line.strip()))
-    except ValueError: # readline on closed file
-        pass # Stream closed, expected
+    except ValueError:
+        pass
     except Exception as e:
-        # Log error if queue is available and stream name is known
         if queue and stream_name_tag:
             try:
                 queue.put((stream_name_tag, f"Error reading stream {stream_name_tag}: {e}"))
-            except Exception: # If queue itself is an issue
+            except Exception:
                 logger.error(f"CRITICAL: Could not queue error for {stream_name_tag}: {e}")
         else:
             logger.error(f"Error reading stream (unknown or queue unavailable): {e}")
@@ -64,12 +75,12 @@ def stream_reader_thread_func(stream, queue, stream_name_tag):
             try:
                 stream.close()
             except Exception:
-                pass # Ignore errors on close
+                pass
         if queue and stream_name_tag:
             try:
-                queue.put((stream_name_tag, None)) # Signal end of this stream
+                queue.put((stream_name_tag, None))
             except Exception:
-                pass # Ignore if queue is already down
+                pass
 
 class BotProcess:
     def __init__(self):
@@ -87,12 +98,12 @@ class BotProcess:
         self.log_handler_thread.start()
 
     def _log_bot_output_loop(self):
-        active_streams = 2 # stdout and stderr
+        active_streams = 2
         logger.info("Bot output log handler started.")
         while not self._stop_logging_event.is_set() and active_streams > 0:
             try:
                 stream_name, line = self.output_queue.get(timeout=0.1)
-                if line is None: # A stream ended
+                if line is None:
                     active_streams -= 1
                     logger.info(f"Bot's {stream_name} stream has ended.")
                     continue
@@ -101,9 +112,8 @@ class BotProcess:
                     logger.info(f"BOT_STDOUT: {line}")
                 elif stream_name == "stderr":
                     logger.warning(f"BOT_STDERR: {line}")
-                self.output_queue.task_done() # Not strictly necessary if not joining queue
             except Empty:
-                continue # No new message, check stop event
+                continue
             except Exception as e:
                 logger.error(f"Error in bot output log handler: {e}", exc_info=True)
         logger.info(f"Bot output log handler finished (stop_event: {self._stop_logging_event.is_set()}, active_streams: {active_streams}).")
@@ -159,7 +169,7 @@ class BotProcess:
                         preexec_fn=os.setsid, **common_popen_args
                     )
                 
-                self.output_queue = Queue() # Re-initialize queue for new process
+                self.output_queue = Queue()
                 self._start_log_handler()
 
                 self.stdout_thread = threading.Thread(target=stream_reader_thread_func, args=(self.process.stdout, self.output_queue, "stdout"), daemon=True)
@@ -171,7 +181,7 @@ class BotProcess:
 
                 if self.process.poll() is not None:
                     exit_code = self.process.returncode
-                    time.sleep(0.5) # Allow logs to flush
+                    time.sleep(0.5) 
                     self._stop_logging_event.set()
                     if self.log_handler_thread and self.log_handler_thread.is_alive(): self.log_handler_thread.join(timeout=1)
                     logger.error(f"Bot process exited prematurely with code {exit_code}. Check logs for BOT_STDOUT/BOT_STDERR.")
@@ -201,70 +211,98 @@ class BotProcess:
                 return False, "Bot is not running"
 
             pid_to_kill = self.process.pid
-            logger.info(f"Attempting to stop bot process PID: {pid_to_kill}")
+            logger.info(f"Attempting IMMEDIATE FORCEFUL stop for bot process PID: {pid_to_kill}")
             
             pgid_to_kill = None
             if sys.platform != 'win32':
-                try: pgid_to_kill = os.getpgid(pid_to_kill)
+                try: 
+                    pgid_to_kill = os.getpgid(pid_to_kill)
                 except ProcessLookupError:
                     logger.warning(f"Process {pid_to_kill} for pgid lookup vanished. Assuming stopped.")
                     self._ensure_logging_stopped()
                     self.process = None
-                    return True, "Bot process vanished before stop."
+                    return True, "Bot process vanished before forceful stop."
 
-            stopped_gracefully = False
+            kill_attempted_successfully = False
+            stop_message = f"Bot PID {pid_to_kill} stop status uncertain after kill attempt."
+
+            original_process_object = self.process
+
             try:
                 if sys.platform == 'win32':
-                    os.kill(pid_to_kill, signal.CTRL_BREAK_EVENT)
+                    logger.info(f"Force killing bot PID {pid_to_kill} with taskkill /F /T...")
+                    result = subprocess.run(['taskkill', '/F', '/T', '/PID', str(pid_to_kill)], 
+                                            check=False, capture_output=True, timeout=5,
+                                            creationflags=subprocess.CREATE_NO_WINDOW)
+                    if result.returncode == 0:
+                        logger.info(f"taskkill command for PID {pid_to_kill} succeeded.")
+                        kill_attempted_successfully = True
+                    elif "could not be found" in result.stderr.lower() or "no running instance" in result.stderr.lower() or result.returncode == 128:
+                        logger.info(f"taskkill reported PID {pid_to_kill} not found, assuming already stopped.")
+                        kill_attempted_successfully = True
+                    else:
+                        logger.error(f"taskkill for PID {pid_to_kill} failed. RC: {result.returncode}, Err: {result.stderr.strip()}")
                 else:
-                    os.killpg(pgid_to_kill, signal.SIGTERM)
-                self.process.wait(timeout=10)
-                stopped_gracefully = True
-                logger.info(f"Bot PID {pid_to_kill} terminated gracefully.")
-            except subprocess.TimeoutExpired: logger.warning(f"Bot PID {pid_to_kill} timed out graceful stop.")
-            except ProcessLookupError: stopped_gracefully = True; logger.info(f"Bot PID {pid_to_kill} vanished during graceful stop.")
-            except Exception as e: logger.error(f"Error during graceful stop (PID {pid_to_kill}): {e}")
+                    effective_pgid = pgid_to_kill if pgid_to_kill else os.getpgid(pid_to_kill)
+                    logger.info(f"Force killing bot PGID {effective_pgid} (PID {pid_to_kill}) with SIGKILL...")
+                    os.killpg(effective_pgid, signal.SIGKILL)
+                    kill_attempted_successfully = True
+                
+                if kill_attempted_successfully:
+                    logger.info(f"Force kill command issued for PID {pid_to_kill}.")
+                    if original_process_object:
+                        try:
+                            original_process_object.wait(timeout=1)
+                            logger.info(f"PID {pid_to_kill} confirmed exited after kill.")
+                        except subprocess.TimeoutExpired:
+                            logger.warning(f"PID {pid_to_kill} did not exit within 1s of kill command. OS may still be processing.")
+                        except Exception: 
+                            pass
+                
+                stop_message = f"Force kill attempted for bot PID {pid_to_kill}."
+                if not kill_attempted_successfully and original_process_object and original_process_object.poll() is not None:
+                    kill_attempted_successfully = True
+                    stop_message += " Process found terminated."
 
-            if not stopped_gracefully:
-                try:
-                    if self.process.poll() is None: # Check if still running
-                        logger.info(f"Force killing bot PID {pid_to_kill}...")
-                        if sys.platform == 'win32':
-                            subprocess.run(['taskkill', '/F', '/T', '/PID', str(pid_to_kill)], check=False, capture_output=True, creationflags=subprocess.CREATE_NO_WINDOW)
-                        else:
-                            os.killpg(pgid_to_kill if pgid_to_kill else os.getpgid(pid_to_kill), signal.SIGKILL)
-                        self.process.wait(timeout=5)
-                    logger.info(f"Bot PID {pid_to_kill} force kill sequence complete.")
-                except subprocess.TimeoutExpired: logger.error(f"Bot PID {pid_to_kill} force kill timed out.")
-                except ProcessLookupError: logger.info(f"Bot PID {pid_to_kill} vanished during force kill.")
-                except Exception as e: logger.error(f"Error during force kill (PID {pid_to_kill}): {e}")
+
+            except subprocess.TimeoutError: 
+                 logger.error(f"taskkill command itself for PID {pid_to_kill} timed out.")
+                 stop_message = f"taskkill command for PID {pid_to_kill} timed out."
+            except ProcessLookupError: 
+                logger.info(f"Process {pid_to_kill} vanished during forceful stop attempt. Assumed stopped.")
+                kill_attempted_successfully = True
+                stop_message = f"Bot PID {pid_to_kill} stopped (vanished during force kill)."
+            except Exception as e:
+                logger.error(f"Exception during forceful stop for PID {pid_to_kill}: {e}")
+                stop_message = f"Error during forceful stop for PID {pid_to_kill}: {e}"
             
-            self._ensure_logging_stopped() # Signal and wait for logging threads
-            
-            # Final check on process
-            final_poll = self.process.poll() if self.process else "N/A (cleared)"
-            self.process = None # Clear process attribute
-            
-            if final_poll is not None or stopped_gracefully: # If it's confirmed dead or was stopped gracefully
-                return True, f"Bot PID {pid_to_kill} stopped."
-            else:
-                return False, f"Bot PID {pid_to_kill} stop status uncertain."
+            finally:
+                self.process = None
+                
+                if original_process_object and hasattr(original_process_object, 'stdout') and original_process_object.stdout:
+                    try: original_process_object.stdout.close()
+                    except Exception: pass
+                if original_process_object and hasattr(original_process_object, 'stderr') and original_process_object.stderr:
+                    try: original_process_object.stderr.close()
+                    except Exception: pass
+
+                self._ensure_logging_stopped()
+
+            return kill_attempted_successfully, stop_message
 
 
     def _ensure_logging_stopped(self):
         self._stop_logging_event.set()
-        # Threads should see event and exit. Pipes will close when process dies.
         if self.stdout_thread and self.stdout_thread.is_alive():
-            try: self.stdout_thread.join(timeout=1)
+            try: self.stdout_thread.join(timeout=0.2)
             except Exception: pass
         if self.stderr_thread and self.stderr_thread.is_alive():
-            try: self.stderr_thread.join(timeout=1)
+            try: self.stderr_thread.join(timeout=0.2)
             except Exception: pass
         if self.log_handler_thread and self.log_handler_thread.is_alive():
-            try: self.log_handler_thread.join(timeout=2) # Give log handler more time
+            try: self.log_handler_thread.join(timeout=0.5)
             except Exception: pass
         logger.debug("Logging threads cleanup attempted.")
-
 
     def is_running(self):
         with self.lock:
@@ -276,9 +314,8 @@ class BotProcess:
             logger.info("Server shutting down. Stopping bot process if running...")
             self.stop()
         else:
-            self._ensure_logging_stopped() # Ensure loggers are stopped even if bot wasn't "running" by poll
+            self._ensure_logging_stopped()
         logger.info("Bot manager cleanup finished.")
-
 
 bot_manager = BotProcess()
 
@@ -291,7 +328,7 @@ class SettingsHandler(http.server.SimpleHTTPRequestHandler):
         super().__init__(*args, directory=self.html_dir, **kwargs)
         
     def log_message(self, format, *args):
-        pass # Suppress default SimpleHTTPRequestHandler logging
+        pass
 
     def do_GET(self):
         parsed_path = urlparse(self.path)
@@ -376,10 +413,10 @@ class SettingsHandler(http.server.SimpleHTTPRequestHandler):
                         backup_path = SETTINGS_PATH + ".bak"
                         try:
                             os.replace(SETTINGS_PATH, backup_path)
-                        except Exception: # Fallback for cross-device link error, etc.
+                        except Exception: 
                             import shutil
-                            shutil.copy2(SETTINGS_PATH, backup_path) # copy2 preserves metadata
-                            os.remove(SETTINGS_PATH) # Then remove original before writing new one
+                            shutil.copy2(SETTINGS_PATH, backup_path) 
+                            os.remove(SETTINGS_PATH) 
                     
                     with open(SETTINGS_PATH, "w", encoding='utf-8') as f:
                         json.dump(new_settings_data, f, indent=4, ensure_ascii=False)
@@ -405,7 +442,7 @@ class SettingsHandler(http.server.SimpleHTTPRequestHandler):
                 if not token_key or not isinstance(token_key, str) or token_value is None: 
                     raise ValueError("Missing or invalid 'token_key'. 'token_value' can be empty to clear.")
                 
-                if not all(c.isalnum() or c == '_' for c in token_key): # Basic validation for .env key
+                if not all(c.isalnum() or c == '_' for c in token_key): 
                     raise ValueError(f"Invalid token_key format: {token_key}. Only alphanumeric and underscores allowed.")
 
                 os.makedirs(SRC_DIR, exist_ok=True)
@@ -415,16 +452,16 @@ class SettingsHandler(http.server.SimpleHTTPRequestHandler):
                     with open(ENV_FILE_PATH, 'r', encoding='utf-8') as f_env:
                         for line in f_env:
                             line = line.strip()
-                            if line and '=' in line and not line.startswith('#'): # Basic .env line parsing
+                            if line and '=' in line and not line.startswith('#'): 
                                 key_val_pair = line.split('=', 1)
                                 if len(key_val_pair) == 2:
                                     env_vars[key_val_pair[0]] = key_val_pair[1]
                 
-                env_vars[token_key] = str(token_value) # Ensure value is string for .env
+                env_vars[token_key] = str(token_value) 
 
                 with open(ENV_FILE_PATH, 'w', encoding='utf-8') as f_env:
                     for k, v in env_vars.items():
-                        f_env.write(f"{k}={v}\n") # Write consistently
+                        f_env.write(f"{k}={v}\n") 
                 
                 logger.info(f"Updated {token_key} in {ENV_FILE_PATH}")
                 self.send_response(200)
@@ -460,14 +497,16 @@ class SettingsHandler(http.server.SimpleHTTPRequestHandler):
             response_data = {"running": bot_manager.is_running()} 
             response_status_code = 200
             
+            response_data["success"] = success
             if success:
-                response_data["success"] = True
                 response_data["message"] = result_msg
             else:
-                response_data["success"] = False
                 response_data["error"] = result_msg
                 response_data["message"] = result_msg 
-                if "not running" not in str(result_msg).lower() and "not found" not in str(result_msg).lower() and "vanished" not in str(result_msg).lower():
+                if "not running" not in str(result_msg).lower() and \
+                   "not found" not in str(result_msg).lower() and \
+                   "vanished" not in str(result_msg).lower() and \
+                   "already stopped" not in str(result_msg).lower():
                     response_status_code = 500 
 
             self.send_response(response_status_code)
@@ -537,7 +576,7 @@ def run_server():
         logger.info("Ctrl+C received, shutting down server...")
     finally:
         logger.info("Initiating server shutdown sequence...")
-        bot_manager.cleanup() # This will stop the bot and its logging threads
+        bot_manager.cleanup()
         server.shutdown()
         server.server_close()
         logger.info("Settings editor server stopped.")

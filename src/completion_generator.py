@@ -16,7 +16,22 @@ class CompletionGenerator:
         backup_providers: list[LLM_Provider]
     ):
         self.providers = backup_providers
-        self.providers.insert(0, primairy_provider)
+        if self.providers == None:
+            self.providers = []
+        
+        if primairy_provider:
+            self.providers.insert(0, primairy_provider)
+        
+        custom_url = os.environ.get('CUSTOM_COMPLETION_URL', None)
+        custom_model = os.environ.get('CUSTOM_COMPLETION_MODEL', None)
+        custom_key = os.environ.get('CUSTOM_COMPLETION_KEY', None)
+        
+        if custom_url and custom_model and custom_key:
+            custom_provider = LLM_Provider(endpoint=custom_url, model=custom_model, provider="Fireworks")
+            custom_provider.api_key = custom_key
+            self.providers.insert(0, custom_provider)
+        
+        
         
     async def fetch_completion(self, payload, provider_index=0, timeout=15):
         

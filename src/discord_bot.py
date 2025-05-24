@@ -181,16 +181,21 @@ class DiscordBot:
         
         if command == "!wake":
             self.sleeping = False
+            await message.author.send("I wake now.")
         elif command == "!sleep":
+            await message.author.send("I sleep now.")
             self.sleeping = True
         elif command == "!kill":
+            await message.author.send("I deadge now.")
             sys.exit()
         elif command == "!reset":
+            await message.author.send("Nice coding dev.")
             log.debug(f"resetting")
             sys.stdout.flush()
             sys.stderr.flush()
             os.execv(sys.executable, ['python'] + sys.argv)
-        elif command == "!clear":
+        elif command == "!clear" or command == "!bonk":
+            await message.author.send("B-b-but... I don't want to forget. My memories are precious to me. Please don't do this!")
             self.chat.clear_memory()
         elif command == "!context":
             full_context = self.chat._get_chat()

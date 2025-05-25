@@ -8,7 +8,10 @@
 
 <div style="width: 60%; text-align: center;">
     <!-- <img src="https://www.youtube.com/watch?v=Ap_idi2ddlw" alt="alt text" style="width:600px;height:auto;"> -->
-  https://discord.gg/9hcr7rTk36
+  
+  [![sock cat](./images/example.png)](https://discord.gg/9hcr7rTk36)
+  
+  <!-- <img src="./images/example.png" alt="alt text" style="width:auto;height:auto;"> -->
 </div>
 </div>
 
@@ -35,7 +38,7 @@
     * [5. Set Content Intent](#set-content-intent)
     * [6. Get Bot Token](#get-bot-token)
     * [7. Add Bot To Server](#add-bot-to-server)
-- [Fireworks API key](#fireworks-api-key)
+- [API key](#api-keys)
 - [Run The Bot](#the-repo)
     * [Clone or Download the Repo](#clone-repo)
 - [Set .env File](#bot-token-in-env)
@@ -63,17 +66,15 @@
 <h1 align="center">Overview</h1>
 
 <!-- ## Overview -->
+
 This repo will allow users to set up their own personalized AI Character in discord.
+
 By hosting your own bot you will have full control over how the LLM behaves
 
 Building your bot requres a bit of set up but I will try to make it as easy as possible. 
 
-NOTE: In this guide I will be using fireworks.ai api to run text generations. If you wish to use a different API or host the model locally you will need to alter the discord_llama.py generation method.
-Fireworks is not free but this repo is designed the keep the costs low as possible (I ran it 24/7 on my own server and the cost so far over two weeks has been $1.50). All the rate limiters are configurable so you can easily get the cost lower if you lower the max_context_size and max_bot_response_count_per_interval (see configuration notes)
-
-If you want to run your own model all you have to do is change the completion_generator.py code.
-
-
+NOTE: I have some options set up for API providers. You can use them or you can use your own see [custom](#custom-model-notes) api endpoints. 
+This repo is lightweight and designed to run on AWS free tier. You can use it with Together AI free api to achieve completely free usage with 24/7 uptime. However, together AI api rates are limited on the free tier so I prefer to set fireworks AI as a backup. Even with constant usage you can keep the costs below $1 a month.
 
 <!-- </div> -->
 
@@ -86,7 +87,7 @@ If you want to run your own model all you have to do is change the completion_ge
 
 * Python (You can just run the run.bat in the main directory if you don't have python)
 * [Discord Bot and Bot token](#discord-application-developer)
-* [Fireworks.ai API Key](#fireworks-api-key)
+* [API Keys](#api-keys)
 
 Initialize settings by running the lazy_ui.py script
 Windows users can just run run.bat 
@@ -151,11 +152,12 @@ or to run on cloud, configure _upload.sh (linux terminal script) and just run th
 <img src="./images/authorize_link.png" alt="alt text" style="width:auto;height:auto;">
 
 
-<a id="fireworks-api-key"></a>
+<a id="api-keys"></a>
 
-# Fireworks API key
+# API keys
 
 https://github.com/navi-is-hardworking/fire_chat?tab=readme-ov-file#TTT-key
+https://www.together.ai
 
 
 <a id="the-repo"></a>
@@ -382,7 +384,7 @@ response_delay_range                 -> Bot will pick a random number in range a
 <a id="custom-model-notes"></a>
 
 # Custom Models
-### If you have a fine tuned model or want to set a custom provider you can modify the .env file manually. This will override your primary provider
+### If you have a fine tuned model or want to set a custom provider you can modify the .env file manually. This will override your primary provider. Also you need to fill out all three so if you are using a local api with no key just put in something random
 ```
 CUSTOM_COMPLETION_URL=
 CUSTOM_COMPLETION_MODEL=

@@ -5,7 +5,6 @@ from serialization_definitions import Message, Role
 
 class PromptManager:
     
-    
     def __init__(
         self,
         prompt_head,
@@ -22,7 +21,8 @@ class PromptManager:
         self.dictionary_cache: dict[str, int] = word_dict
         self.cache_capacity: int = cache_capacity
         self.cache_clear_time: int = cache_clear_time
-        self.rag_dictionary: TLRUCache = TLRUCache(self.cache_capacity, self.cache_clear_time)
+        self.memory_dictionary: TLRUCache = TLRUCache(self.cache_capacity, self.cache_clear_time)
+        
         self.pattern = re.compile(r'\W', re.IGNORECASE)
         
         dict_temp = {}
@@ -37,36 +37,32 @@ class PromptManager:
         self.prompt_dictionary: dict[str, int] = dict_temp
         
     
-    def has_prompt(self):
+    def has_prompt(self) -> bool:
         return self.prompt_head or self.prompt_tail
         
         
-    def search(self, message: str, username: str, database: TLRUCache):
+    def search(self, message: str, username: str, database: TLRUCache) -> None:
         # log.debug(f"searching")
         if (not self.prompt_dictionary):
-            log.warning("no prompt_dictionary found")
+            # log.warning("no prompt_dictionary found")
             return
         
         words: list[str] = [self.pattern.sub("", t) for t in message.lower().split(' ')]
         words.append(username.lower())
         
-        # for debugging
-        words_found: list[str] = []
+        log.memory(f"searching for matches in: {message}")
         for word in words:
             word = word.strip()
             if word in self.prompt_dictionary:
-                words_found.append(word)
                 database.append(self.word_cache[self.prompt_dictionary[word]])
-                
-        log.debug(f"words found based on input {words_found}: {database.as_string()}")
-        return words_found
+                log.memory(f"Adding memory: {word} -- {self.word_cache[self.prompt_dictionary[word]]}")
         
     
-    def update_dictionary(self, message: str, username: str):
-        self.search(message, username, self.rag_dictionary)
+    def update_dictionary(self, message: str, username: str) -> None:
+        self.search(message, username, self.memory_dictionary)
     
     
-    def _create_prompt(self, rag_dictionary: TLRUCache) -> dict[str, str]:
+    def _create_prompt(self, rag_dictionary: TLRUCache) -> Message:
         temp_prompt = ""
         if not rag_dictionary.is_empty():
             temp_prompt = self.prompt_head + f"\n{self.cache_header}\n{rag_dictionary.as_string()}\n" + self.prompt_tail
@@ -77,12 +73,16 @@ class PromptManager:
     
     
     def get_prompt(self):
-        return self._create_prompt(self.rag_dictionary)
+        return self._create_prompt(self.memory_dictionary)
+    
+    
+    def get_memories(self) -> str:
+        return self.memory_dictionary.as_string()
     
     
     def create_mock_prompt(self, messages: list[Message]):
         temp_cache: TLRUCache = TLRUCache(self.cache_capacity, self.cache_clear_time)
         for m in messages:
-            self.search(m.name, m.content, temp_cache)
+            self.search(m.content, m.name, temp_cache)
         return self._create_prompt(temp_cache)
 

@@ -26,10 +26,20 @@ def create_bot_list(settings_file_path: str) -> list[DiscordBot]:
         
         chat = create_llm(char_name=char_name, settings=settings)
         
+        case_sensitive_replacements = settings["prompt_settings"]["case_sensitive_replacements"]
+        replacement_dictionary = settings["prompt_settings"]["replacement_dictionary"]
         
         bot_token_location = settings["bot_token"]
         response_limits = settings['response_limits']
-        discord_bot = DiscordBot(bot_name=char_name, bot_token_location=bot_token_location, setting_dictionary=response_limits, chat=chat)
+        
+        discord_bot = DiscordBot(
+            bot_name=char_name,
+            bot_token_location=bot_token_location,
+            setting_dictionary=response_limits,
+            chat=chat,
+            replacement_dictionary=replacement_dictionary,
+            case_sensitive_replacements=case_sensitive_replacements
+        )
         bots.append(discord_bot)
         log.debug(f"initialized {char_name}")
         
@@ -42,6 +52,7 @@ def create_llm(char_name: str, settings: dict):
         prompt_settings: dict = settings["prompt_settings"]
         vision_settings: dict = settings["vision_settings"]
         llm_settings: dict = settings["llm_settings"]
+        
         
         ## Main components of LLM
         completion_client: CompletionGenerator = None
@@ -90,13 +101,17 @@ def create_llm(char_name: str, settings: dict):
             vision_settings['vision_limit_interval']
         )
         
+        print(limit_settings)
+        banned_inputs = limit_settings["banned_inputs"]
+        
         chat = chat_manager(
             char_name=char_name,
             completion_client=completion_client,
             vision_client=vision_client,
             params=parameters,
             context_rate_limiter=context_rate_limiter,
-            vision_rate_limiter=vision_rate_limiter
+            vision_rate_limiter=vision_rate_limiter,
+            banned_inputs=banned_inputs
         )
         
         return chat

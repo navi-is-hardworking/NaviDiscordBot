@@ -18,15 +18,26 @@ import sys
 import threading
 import webbrowser
 import argparse
-import logging
 import subprocess
 import signal
 import time
 from urllib.parse import urlparse, parse_qs
 from queue import Queue, Empty
+from src.logger import log
 
-logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
-logger = logging.getLogger("SettingsServer")
+def create_temp_loader():
+    with open('temp_loader.js', 'w') as temp_file:
+        temp_file.write('')
+    
+    with open('temp_loader.js', 'w') as temp_file:
+        with open('ui_schema.js', 'r') as ui_schema:
+            temp_file.write(ui_schema.read())
+        with open('lazy_loader.js', 'r') as lazy_loader:
+            temp_file.write(lazy_loader.read())
+    print("temp_loader.js created successfully")
+
+create_temp_loader()
+
 
 parser = argparse.ArgumentParser(description='Run a local settings editor server.')
 parser.add_argument('--port', type=int, default=8090, help='Port to run the server on')
@@ -50,9 +61,9 @@ if not os.path.exists(SETTINGS_PATH):
     try:
         with open(SETTINGS_PATH, 'w', encoding='utf-8') as f:
             json.dump({}, f, indent=4)
-        logger.info(f"Created new settings file at {SETTINGS_PATH}")
+        log.info(f"Created new settings file at {SETTINGS_PATH}")
     except Exception as e:
-        logger.error(f"Failed to create settings file: {e}")
+        log.error(f"Failed to create settings file: {e}")
         sys.exit(1)
 
 def stream_reader_thread_func(stream, queue, stream_name_tag):
@@ -67,9 +78,9 @@ def stream_reader_thread_func(stream, queue, stream_name_tag):
             try:
                 queue.put((stream_name_tag, f"Error reading stream {stream_name_tag}: {e}"))
             except Exception:
-                logger.error(f"CRITICAL: Could not queue error for {stream_name_tag}: {e}")
+                log.error(f"CRITICAL: Could not queue error for {stream_name_tag}: {e}")
         else:
-            logger.error(f"Error reading stream (unknown or queue unavailable): {e}")
+            log.error(f"Error reading stream (unknown or queue unavailable): {e}")
     finally:
         if stream:
             try:
@@ -99,24 +110,24 @@ class BotProcess:
 
     def _log_bot_output_loop(self):
         active_streams = 2
-        logger.info("Bot output log handler started.")
+        log.info("Bot output log handler started.")
         while not self._stop_logging_event.is_set() and active_streams > 0:
             try:
                 stream_name, line = self.output_queue.get(timeout=0.1)
                 if line is None:
                     active_streams -= 1
-                    logger.info(f"Bot's {stream_name} stream has ended.")
+                    log.info(f"Bot's {stream_name} stream has ended.")
                     continue
                 
                 if stream_name == "stdout":
-                    logger.info(f"BOT_STDOUT: {line}")
+                    log.info(f"BOT_STDOUT: {line}")
                 elif stream_name == "stderr":
-                    logger.warning(f"BOT_STDERR: {line}")
+                    log.warning(f"BOT_STDERR: {line}")
             except Empty:
                 continue
             except Exception as e:
-                logger.error(f"Error in bot output log handler: {e}", exc_info=True)
-        logger.info(f"Bot output log handler finished (stop_event: {self._stop_logging_event.is_set()}, active_streams: {active_streams}).")
+                log.error(f"Error in bot output log handler: {e}", exc_info=True)
+        log.info(f"Bot output log handler finished (stop_event: {self._stop_logging_event.is_set()}, active_streams: {active_streams}).")
 
 
     def start(self, settings_file_for_bot):
@@ -126,15 +137,15 @@ class BotProcess:
 
             bot_script_path = os.path.join(SRC_DIR, "bot.py")
             if not os.path.exists(bot_script_path):
-                logger.error(f"Bot script not found at {bot_script_path}")
+                log.error(f"Bot script not found at {bot_script_path}")
                 return False, f"Bot script not found at {bot_script_path}"
             if not os.path.exists(settings_file_for_bot):
-                logger.error(f"Settings file for bot run not found at {settings_file_for_bot}")
+                log.error(f"Settings file for bot run not found at {settings_file_for_bot}")
                 return False, f"Settings file for bot run not found: {settings_file_for_bot}"
 
             bot_env = os.environ.copy()
             if os.path.exists(ENV_FILE_PATH):
-                logger.info(f"Loading environment variables from {ENV_FILE_PATH} for bot process")
+                log.info(f"Loading environment variables from {ENV_FILE_PATH} for bot process")
                 with open(ENV_FILE_PATH, 'r', encoding='utf-8') as f_env:
                     for line in f_env:
                         line = line.strip()
@@ -143,10 +154,10 @@ class BotProcess:
                             if len(key_val) == 2:
                                 bot_env[key_val[0]] = key_val[1]
             else:
-                logger.warning(f".env file not found at {ENV_FILE_PATH}. Bot might not have necessary API keys.")
+                log.warning(f".env file not found at {ENV_FILE_PATH}. Bot might not have necessary API keys.")
             
             try:
-                logger.info(f"Starting bot with: {sys.executable} {bot_script_path} {os.path.abspath(settings_file_for_bot)}")
+                log.info(f"Starting bot with: {sys.executable} {bot_script_path} {os.path.abspath(settings_file_for_bot)}")
                 
                 common_popen_args = {
                     "cwd": SRC_DIR, "env": bot_env,
@@ -184,20 +195,20 @@ class BotProcess:
                     time.sleep(0.5) 
                     self._stop_logging_event.set()
                     if self.log_handler_thread and self.log_handler_thread.is_alive(): self.log_handler_thread.join(timeout=1)
-                    logger.error(f"Bot process exited prematurely with code {exit_code}. Check logs for BOT_STDOUT/BOT_STDERR.")
+                    log.error(f"Bot process exited prematurely with code {exit_code}. Check logs for BOT_STDOUT/BOT_STDERR.")
                     self.process = None
                     return False, f"Bot failed to start (exit code {exit_code}). See server logs for bot output."
                 
-                logger.info(f"Bot started with PID: {self.process.pid}. Output is being monitored.")
+                log.info(f"Bot started with PID: {self.process.pid}. Output is being monitored.")
                 return True, self.process.pid
 
             except Exception as e:
-                logger.error(f"Exception starting bot: {e}", exc_info=True)
+                log.error(f"Exception starting bot: {e}", exc_info=True)
                 if self.process: 
                     try:
                         if self.process.poll() is None: self.process.kill()
                         self.process.communicate(timeout=1) 
-                    except Exception as e_cleanup: logger.error(f"Error during cleanup of failed bot start: {e_cleanup}")
+                    except Exception as e_cleanup: log.error(f"Error during cleanup of failed bot start: {e_cleanup}")
                 self.process = None
                 self._stop_logging_event.set()
                 if self.log_handler_thread and self.log_handler_thread.is_alive(): self.log_handler_thread.join(timeout=1)
@@ -206,19 +217,19 @@ class BotProcess:
     def stop(self):
         with self.lock:
             if self.process is None or self.process.poll() is not None:
-                logger.info("Stop command: Bot not running or already stopped.")
+                log.info("Stop command: Bot not running or already stopped.")
                 self._ensure_logging_stopped()
                 return False, "Bot is not running"
 
             pid_to_kill = self.process.pid
-            logger.info(f"Attempting IMMEDIATE FORCEFUL stop for bot process PID: {pid_to_kill}")
+            log.info(f"Attempting IMMEDIATE FORCEFUL stop for bot process PID: {pid_to_kill}")
             
             pgid_to_kill = None
             if sys.platform != 'win32':
                 try: 
                     pgid_to_kill = os.getpgid(pid_to_kill)
                 except ProcessLookupError:
-                    logger.warning(f"Process {pid_to_kill} for pgid lookup vanished. Assuming stopped.")
+                    log.warning(f"Process {pid_to_kill} for pgid lookup vanished. Assuming stopped.")
                     self._ensure_logging_stopped()
                     self.process = None
                     return True, "Bot process vanished before forceful stop."
@@ -230,32 +241,32 @@ class BotProcess:
 
             try:
                 if sys.platform == 'win32':
-                    logger.info(f"Force killing bot PID {pid_to_kill} with taskkill /F /T...")
+                    log.info(f"Force killing bot PID {pid_to_kill} with taskkill /F /T...")
                     result = subprocess.run(['taskkill', '/F', '/T', '/PID', str(pid_to_kill)], 
                                             check=False, capture_output=True, timeout=5,
                                             creationflags=subprocess.CREATE_NO_WINDOW)
                     if result.returncode == 0:
-                        logger.info(f"taskkill command for PID {pid_to_kill} succeeded.")
+                        log.info(f"taskkill command for PID {pid_to_kill} succeeded.")
                         kill_attempted_successfully = True
                     elif "could not be found" in result.stderr.lower() or "no running instance" in result.stderr.lower() or result.returncode == 128:
-                        logger.info(f"taskkill reported PID {pid_to_kill} not found, assuming already stopped.")
+                        log.info(f"taskkill reported PID {pid_to_kill} not found, assuming already stopped.")
                         kill_attempted_successfully = True
                     else:
-                        logger.error(f"taskkill for PID {pid_to_kill} failed. RC: {result.returncode}, Err: {result.stderr.strip()}")
+                        log.error(f"taskkill for PID {pid_to_kill} failed. RC: {result.returncode}, Err: {result.stderr.strip()}")
                 else:
                     effective_pgid = pgid_to_kill if pgid_to_kill else os.getpgid(pid_to_kill)
-                    logger.info(f"Force killing bot PGID {effective_pgid} (PID {pid_to_kill}) with SIGKILL...")
+                    log.info(f"Force killing bot PGID {effective_pgid} (PID {pid_to_kill}) with SIGKILL...")
                     os.killpg(effective_pgid, signal.SIGKILL)
                     kill_attempted_successfully = True
                 
                 if kill_attempted_successfully:
-                    logger.info(f"Force kill command issued for PID {pid_to_kill}.")
+                    log.info(f"Force kill command issued for PID {pid_to_kill}.")
                     if original_process_object:
                         try:
                             original_process_object.wait(timeout=1)
-                            logger.info(f"PID {pid_to_kill} confirmed exited after kill.")
+                            log.info(f"PID {pid_to_kill} confirmed exited after kill.")
                         except subprocess.TimeoutExpired:
-                            logger.warning(f"PID {pid_to_kill} did not exit within 1s of kill command. OS may still be processing.")
+                            log.warning(f"PID {pid_to_kill} did not exit within 1s of kill command. OS may still be processing.")
                         except Exception: 
                             pass
                 
@@ -266,14 +277,14 @@ class BotProcess:
 
 
             except subprocess.TimeoutError: 
-                 logger.error(f"taskkill command itself for PID {pid_to_kill} timed out.")
+                 log.error(f"taskkill command itself for PID {pid_to_kill} timed out.")
                  stop_message = f"taskkill command for PID {pid_to_kill} timed out."
             except ProcessLookupError: 
-                logger.info(f"Process {pid_to_kill} vanished during forceful stop attempt. Assumed stopped.")
+                log.info(f"Process {pid_to_kill} vanished during forceful stop attempt. Assumed stopped.")
                 kill_attempted_successfully = True
                 stop_message = f"Bot PID {pid_to_kill} stopped (vanished during force kill)."
             except Exception as e:
-                logger.error(f"Exception during forceful stop for PID {pid_to_kill}: {e}")
+                log.error(f"Exception during forceful stop for PID {pid_to_kill}: {e}")
                 stop_message = f"Error during forceful stop for PID {pid_to_kill}: {e}"
             
             finally:
@@ -302,20 +313,20 @@ class BotProcess:
         if self.log_handler_thread and self.log_handler_thread.is_alive():
             try: self.log_handler_thread.join(timeout=0.5)
             except Exception: pass
-        logger.debug("Logging threads cleanup attempted.")
+        log.debug("Logging threads cleanup attempted.")
 
     def is_running(self):
         with self.lock:
             return self.process is not None and self.process.poll() is None
 
     def cleanup(self):
-        logger.info("Bot manager cleanup initiated.")
+        log.info("Bot manager cleanup initiated.")
         if self.is_running():
-            logger.info("Server shutting down. Stopping bot process if running...")
+            log.info("Server shutting down. Stopping bot process if running...")
             self.stop()
         else:
             self._ensure_logging_stopped()
-        logger.info("Bot manager cleanup finished.")
+        log.info("Bot manager cleanup finished.")
 
 bot_manager = BotProcess()
 
@@ -344,7 +355,7 @@ class SettingsHandler(http.server.SimpleHTTPRequestHandler):
             self.wfile.write(SettingsHandler.HTML_CONTENT.encode('utf-8'))
             return
 
-        elif path_only == "/lazy_loader.js":
+        elif path_only == "/temp_loader.js":
             self.send_response(200)
             self.send_header("Content-type", "application/javascript; charset=utf-8")
             self.send_header("Cache-Control", "no-cache, no-store, must-revalidate")
@@ -368,13 +379,13 @@ class SettingsHandler(http.server.SimpleHTTPRequestHandler):
                 self.end_headers()
                 self.wfile.write(b"{}")
             except json.JSONDecodeError as e:
-                logger.error(f"Invalid JSON in settings file: {e}. Sending empty JSON to client.")
+                log.error(f"Invalid JSON in settings file: {e}. Sending empty JSON to client.")
                 self.send_response(200) 
                 self.send_header("Content-type", "application/json; charset=utf-8")
                 self.end_headers()
                 self.wfile.write(b"{}")
             except Exception as e:
-                logger.error(f"Error reading settings: {e}. Sending empty JSON to client.")
+                log.error(f"Error reading settings: {e}. Sending empty JSON to client.")
                 self.send_response(500)
                 self.send_header("Content-type", "application/json; charset=utf-8")
                 self.end_headers()
@@ -426,7 +437,7 @@ class SettingsHandler(http.server.SimpleHTTPRequestHandler):
                 self.end_headers()
                 self.wfile.write(json.dumps({"success": True, "message": "Settings saved."}).encode('utf-8'))
             except Exception as e:
-                logger.error(f"Error saving settings: {e}", exc_info=True)
+                log.error(f"Error saving settings: {e}", exc_info=True)
                 self.send_response(500)
                 self.send_header("Content-type", "application/json; charset=utf-8")
                 self.end_headers()
@@ -463,14 +474,14 @@ class SettingsHandler(http.server.SimpleHTTPRequestHandler):
                     for k, v in env_vars.items():
                         f_env.write(f"{k}={v}\n") 
                 
-                logger.info(f"Updated {token_key} in {ENV_FILE_PATH}")
+                log.info(f"Updated {token_key} in {ENV_FILE_PATH}")
                 self.send_response(200)
                 self.send_header("Content-type", "application/json; charset=utf-8")
                 self.end_headers()
                 self.wfile.write(json.dumps({"success": True, "updated_token_key": token_key, "message": f"{token_key} updated in .env"}).encode('utf-8'))
 
             except Exception as e:
-                logger.error(f"Error updating token: {e}", exc_info=True)
+                log.error(f"Error updating token: {e}", exc_info=True)
                 self.send_response(500)
                 self.send_header("Content-type", "application/json; charset=utf-8")
                 self.end_headers()
@@ -526,45 +537,45 @@ class ThreadedHTTPServer(socketserver.ThreadingMixIn, http.server.HTTPServer):
     allow_reuse_address = True
 
 def run_server():
-    js_file_path = os.path.join(os.path.dirname(HTML_PATH), "lazy_loader.js")
+    js_file_path = os.path.join(os.path.dirname(HTML_PATH), "temp_loader.js")
 
     if os.path.exists(HTML_PATH):
         try:
             with open(HTML_PATH, "r", encoding='utf-8') as f:
                 SettingsHandler.HTML_CONTENT = f.read()
-            logger.info(f"Loaded HTML UI from {HTML_PATH}")
+            log.info(f"Loaded HTML UI from {HTML_PATH}")
         except Exception as e:
-            logger.error(f"Failed to load HTML UI {HTML_PATH}: {e}")
+            log.error(f"Failed to load HTML UI {HTML_PATH}: {e}")
             SettingsHandler.HTML_CONTENT = "<html><body><h1>Error loading UI. Check server logs.</h1></body></html>"
     else:
-        logger.error(f"HTML UI file not found at {HTML_PATH}")
+        log.error(f"HTML UI file not found at {HTML_PATH}")
         SettingsHandler.HTML_CONTENT = "<html><body><h1>UI HTML file not found.</h1><p>Expected at: "+HTML_PATH+"</p></body></html>"
 
     if os.path.exists(js_file_path):
         try:
             with open(js_file_path, "r", encoding='utf-8') as f:
                 SettingsHandler.JS_CONTENT = f.read()
-            logger.info(f"Loaded JS from {js_file_path}")
+            log.info(f"Loaded JS from {js_file_path}")
         except Exception as e:
-            logger.error(f"Failed to load JS file {js_file_path}: {e}")
-            SettingsHandler.JS_CONTENT = "console.error('Failed to load lazy_loader.js');"
+            log.error(f"Failed to load JS file {js_file_path}: {e}")
+            SettingsHandler.JS_CONTENT = "console.error('Failed to load temp_loader.js');"
     else:
-        logger.error(f"JavaScript file not found at {js_file_path}")
-        SettingsHandler.JS_CONTENT = "console.error('lazy_loader.js not found at expected path.');"
+        log.error(f"JavaScript file not found at {js_file_path}")
+        SettingsHandler.JS_CONTENT = "console.error('temp_loader.js not found at expected path.');"
 
     try:
         server = ThreadedHTTPServer(("", PORT), SettingsHandler)
     except OSError as e:
-        logger.error(f"Could not start server on port {PORT}: {e}")
+        log.error(f"Could not start server on port {PORT}: {e}")
         sys.exit(1)
 
     server_thread = threading.Thread(target=server.serve_forever)
     server_thread.daemon = True
     server_thread.start()
     
-    logger.info(f"Settings editor server started at http://localhost:{PORT}")
-    logger.info(f"Settings JSON path: {SETTINGS_PATH}")
-    logger.info("Press Ctrl+C to shut down the server.")
+    log.info(f"Settings editor server started at http://localhost:{PORT}")
+    log.info(f"Settings JSON path: {SETTINGS_PATH}")
+    log.info("Press Ctrl+C to shut down the server.")
 
     if "Error loading UI" not in SettingsHandler.HTML_CONTENT and "UI HTML file not found" not in SettingsHandler.HTML_CONTENT :
         webbrowser.open_new_tab(f"http://localhost:{PORT}")
@@ -573,13 +584,13 @@ def run_server():
         while not shutdown_event.is_set():
             shutdown_event.wait(0.5)
     except KeyboardInterrupt:
-        logger.info("Ctrl+C received, shutting down server...")
+        log.info("Ctrl+C received, shutting down server...")
     finally:
-        logger.info("Initiating server shutdown sequence...")
+        log.info("Initiating server shutdown sequence...")
         bot_manager.cleanup()
         server.shutdown()
         server.server_close()
-        logger.info("Settings editor server stopped.")
+        log.info("Settings editor server stopped.")
 
 if __name__ == "__main__":
     run_server()

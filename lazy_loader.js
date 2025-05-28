@@ -1,3 +1,4 @@
+
 let settings = {};
 let activeTab = null;
 let collapsedSections = {};
@@ -5,121 +6,6 @@ let botRunning = false;
 let autoSaveTimer = null;
 let uiInitTime = 0;
 const PASSWORD_ENTRY_GRACE_PERIOD = 3000;
-
-const visionOptions = {
-    "Fireworks": {
-        "https://api.fireworks.ai/inference/v1/chat/completions": {
-            "Llama-4 Scout V": "accounts/fireworks/models/llama4-scout-instruct-basic",
-            "Llama-4 Maverick V": "accounts/fireworks/models/llama4-maverick-instruct-basic",
-            "Qwen-2.5 32B V": "accounts/fireworks/models/qwen2p5-vl-32b-instruct",
-        }
-    },
-    "TogetherAI": {
-        "https://api.together.xyz/v1/chat/completions": {
-            "Llama-Vision-Free": "meta-llama/Llama-Vision-Free",
-        }
-    }
-};
-
-const modelOptions = {
-    "Fireworks": {
-        "https://api.fireworks.ai/inference/v1/chat/completions": {
-            "Llama-3.1 8B": "accounts/fireworks/models/llama-v3p1-8b-instruct",
-            "Llama-3.1 70B": "accounts/fireworks/models/llama-v3p1-70b-instruct",
-            "Llama-3.1 405B": "accounts/fireworks/models/llama-v3p1-405b-instruct",
-            "Llama-3.3 70B": "accounts/fireworks/models/llama-v3p3-70b-instruct",
-            "Llama-4 Scout V": "accounts/fireworks/models/llama4-scout-instruct-basic",
-            "Llama-4 Maverick V": "accounts/fireworks/models/llama4-maverick-instruct-basic",
-            "Qwen-2.5 32B V": "accounts/fireworks/models/qwen2p5-vl-32b-instruct",
-            "Qwen-3 30B": "accounts/fireworks/models/qwen3-30b-a3b",
-            "Qwen-3 235B": "accounts/fireworks/models/qwen3-235b-a22b",
-        }
-    },
-    "TogetherAI": {
-        "https://api.together.xyz/v1/chat/completions": {
-            "Llama-3.3 70B Free": "meta-llama/Llama-3.3-70B-Instruct-Turbo-Free",
-            "Llama-Vision-Free": "meta-llama/Llama-Vision-Free",
-            "Deepseek Free": "deepseek-ai/DeepSeek-R1-Distill-Llama-70B-free",
-            "Llama-3.3 70B": "meta-llama/Llama-3.3-70B-Instruct-Turbo",
-        }
-    }
-};
-
-let settingsSchema = {
-    _global: {
-        enabled: { type: 'boolean', tooltip: 'Enable or disable this bot' },
-        bot_token: { type: 'text', tooltip: 'Discord Bot Token' },
-        prompt_settings: {
-            prompt_head: { type: 'text', multiline: true, tooltip: 'The main part of the prompt. Add style guidelines and Character definition here.' },
-            dictionary_cache_header: { type: 'text', multiline: true, tooltip: '(Optional) Header text for the dictionary_cache section. Tell the bot what the dictionary_cache means. ie. # Memories, # Notes:, # Response examples... etc...' },
-            dictionary_cache: { type: 'dictionary', tooltip: 'Mini Rag generation for model knowledge. Keywords separated by spaces will retrieve the memory. You can set tons of these to increase the diverity and knowledge of the bots responses. Make sure all the keys are unique and have no special characters. If you find a item popping up too often, try reducing the keyword scope. For example if you set an entry like: key-> like | item-> You like to eat pancakes, Then its likely this item will get stuck in their memory very frequently. You can change it to key-> pancake pancakes | item-> You like to eat pancakes, and this will make it show up only when pancake or pancakes is mentioned.' },
-            cache_capacity: { type: 'number', min: 1, max: 20, tooltip: 'Max number of messages to keep in cache' },
-            cache_clear_time: { type: 'number', min: 0, tooltip: 'The amount of time (second) an item can exist in the cache without being triggered before it is removed. Reducing this can lower AI fixating on a single topic as long as the keyword is not being mentioned repeatedly. Set it too low, though, and it might leave the context before the AI gets a chance to respond.' },
-            prompt_tail: { type: 'text', multiline: true, tooltip: '(Optional) Final note for the model. Example: You are chatting in a discord server. You can set /no_think here for Qwen think models too.' },
-        },
-        llm_settings: {
-            provider: { type: 'text', hidden: true },
-            endpoint: { type: 'text', hidden: true },
-            model: { type: 'text', hidden: true },
-            backup_models: {
-                type: 'array',
-                tooltip: 'List of backup LLM models to try if the primary fails. Ordered by preference.',
-                itemSchema: {
-                    provider: { type: 'select', options: Object.keys(modelOptions), tooltip: "Provider for this backup LLM." },
-                    endpoint: { type: 'text', hidden: true },
-                    model: { type: 'select', options: {}, tooltip: "Model for this backup LLM (populates based on provider)." }
-                }
-            },
-            max_context_length: { type: 'number', min: 0, max: 24000, tooltip: 'Maximum length (characters) of message context (excluding prompt) to use in generation' },
-            min_context_length: { type: 'number', min: 0, max: 24000, tooltip: 'The length (characters) to truncate the message context down to after chat_clear_time interval. (This keeps the context warm and prevents certain bad responses, ie model saying \'I\'m new here\').' },
-            max_tokens: { type: 'number', min: 1, max: 4096, tooltip: 'Maximum number of tokens to generate in the model response. Below 100 tokens is recommended for short responses and to keep costs low' },
-            temperature: { type: 'number', min: 0, max: 2, step: 0.1, tooltip: "Regulates the randomness in token selection during text generation. Higher values means more diversity in token selection but setting it too high can result in gibberish outputs. (safe range from 0 to 1)" },
-            top_p: { type: 'number', min: 0, max: 1, step: 0.05, tooltip: "Filters token selection range based on probability. A value of 1 means all tokens in the vocabulary are considered for selection based on their probabilities. Lower values restrict selection to only the most likely tokens." },
-            top_k: { type: 'number', min: 1, max: 100, tooltip: "Limits token selection to only the top k most probable tokens at each generation step. With value 50, the model considers only the 50 highest probability tokens when deciding what to generate next, discarding all other possibilities." },
-            frequency_penalty: { type: 'number', min: 0, max: 2, step: 0.1, tooltip: "Reduces token repetition, scales up based on the number of times a token has occured the context" },
-            presence_penalty: { type: 'number', min: 0, max: 2, step: 0.1, tooltip: "Reduces the likelyhood a token will be selected if it has already occured in the context. (Unlike frequency penalty it only cares if the token has occured at all in the text, rather than the number of occurences)" },
-            n: { type: 'number', min: 1, max: 5, tooltip: "Number of responses (mainly for testing, wastes tokens in most cases)" },
-            stop: { type: 'array', itemType: 'text', tooltip: "List of tokens that will cause the generation to stop when reached. (You can leave this empty most of the time in chat models. But it can be very useful when using completion models. For example, you can set closing quotes as the stop token to get the model to finish the dialogue.)" },
-            reminder: { type: 'text', multiline: true, tooltip: 'Optional reminder text for the model. Recommended not to use for now' }
-        },
-        vision_settings: {
-            vision_enabled: { type: 'boolean', tooltip: 'Vision Enabled or disabled for this bot' },
-            vision_prompt: { type: 'text', multiline: true, tooltip: 'System prompt for vision requests. Define how the vision model should interpret images.' },
-            provider: { type: 'text', hidden: true },
-            endpoint: { type: 'text', hidden: true },
-            model: { type: 'text', hidden: true },
-            backup_models: {
-                type: 'array',
-                tooltip: 'List of backup vision models.',
-                itemSchema: {
-                    provider: { type: 'select', options: Object.keys(visionOptions), tooltip: "Provider for backup vision model." },
-                    endpoint: { type: 'text', hidden: true },
-                    model: { type: 'select', options: {}, tooltip: "Backup vision model." }
-                }
-            },
-            max_vision_queries_per_interval: { type: 'number', min: 0, tooltip: 'Max number of images that can be read per response limit interval' },
-            vision_limit_interval: { type: 'number', min: 0, tooltip: 'interval at which vision is in time our ot time limit' },
-        },
-        response_limits : {
-            response_limit_interval: { type: 'number', min: 0, tooltip: 'Time interval for rate limiting (seconds)' },
-            max_bot_response_count_per_interval: { type: 'number', min: 1, tooltip: 'Number of responses from the bot allowed within the response_limit_interval' },
-            max_user_input_message_length: { type: 'number', min: 1, tooltip: 'Maximum length of user messages (in characters)' },
-            chat_clear_time: { type: 'number', min: 0, tooltip: 'Time (seconds) before chat history is truncated (see min_context_length)' },
-            monitored_servers: { type: 'array', itemType: 'text', tooltip: 'Will ignore all messages not in this server (except for admin commands)' },
-            monitored_channels: { type: 'array', itemType: 'text', tooltip: 'Channel IDs that the bot can read and write to' },
-            partial_ignore_list: { type: 'array', itemType: 'text', tooltip: 'IDs of users or bots that the bot will read, but will not trigger a response' },
-            full_ignore_list: { type: 'array', itemType: 'text', tooltip: 'IDs that the bot will neither read nor respond to.' },
-            admins: { type: 'array', itemType: 'text', tooltip: 'User IDs that are administrators for this bot. Can use admin commands.' },
-            typing_delay_range: { type: 'range', min: 0, max: 60, tooltip: 'Random number within the range is selected and the bot will spend that much time tyiping to create a typing effect.' },
-            random_occurences_enabled: { type: 'boolean', tooltip: 'Bot can randomly pop up and respond in any channel. Bot will also respond when name is called. Regardless of monitored channels (but only in monitored servers)' },
-        }
-    }
-};
-
-function getApiKeyEnvName(providerName) {
-    if (!providerName) return null;
-    return `${providerName.toUpperCase().replace(/[^A-Z0-9_]/g, '_')}_API_KEY`;
-}
 
 function getFirstProviderAndModelDetails(isVision = false) {
     const optionsToSearch = isVision ? visionOptions : modelOptions;
@@ -165,301 +51,267 @@ if (!defaultVisionSelections.provider && Object.keys(visionOptions).length === 0
     }
 }
 
-const defaultSettings = {
-    enabled: true,
-    bot_token: "YOUR_BOT_NAME_BOT_TOKEN",
-    prompt_settings: {
-        prompt_head: "", prompt_tail: "", dictionary_cache_header: "", dictionary_cache: {},
-        cache_capacity: 3, cache_clear_time: 300
-    },
-    llm_settings: {
-        provider: defaultLLMSelections.provider,
-        endpoint: defaultLLMSelections.endpoint,
-        model: defaultLLMSelections.model,
-        backup_models: [],
-        max_context_length: 3000, min_context_length: 0, max_tokens: 100,
-        temperature: 0.7, top_p: 1, top_k: 50, frequency_penalty: 1, presence_penalty: 0,
-        n: 1, stop: [], reminder: ""
-    },
-    vision_settings: {
-        vision_enabled: false,
-        vision_prompt: "Describe the image in a short but dense description. Use keywords and positional terms only. # Example: green house on hill, surrounded by dense ivy. Dark night. Single Dim lamp on left side of porch",
-        provider: defaultVisionSelections.provider,
-        endpoint: defaultVisionSelections.endpoint,
-        model: defaultVisionSelections.model,
-        backup_models: [],
-        max_vision_queries_per_interval: 4,
-        vision_limit_interval: 120,
-    },
-    response_limits: {
-        max_user_input_message_length: 300, response_limit_interval: 240,
-        max_bot_response_count_per_interval: 20, chat_clear_time: 900,
-        monitored_channels: [], admins: [], partial_ignore_list: [], full_ignore_list: [],
-        typing_delay_range: [1, 12], random_occurences_enabled: false
+
+function getApiKeyEnvName(providerName) {
+    if (!providerName) return null;
+    return `${providerName.toUpperCase().replace(/[^A-Z0-9_]/g, '_')}_API_KEY`;
+}
+
+function createBotConfigFromSchema(botName) {
+    const newBotSettings = {};
+    const globalSchema = settingsSchema._global;
+
+    for (const key in globalSchema) {
+        const schemaEntry = globalSchema[key];
+        if (schemaEntry.fields) {
+            newBotSettings[key] = {};
+            for (const fieldKey in schemaEntry.fields) {
+                const fieldSchema = schemaEntry.fields[fieldKey];
+                newBotSettings[key][fieldKey] = (typeof fieldSchema.default === 'object' && fieldSchema.default !== null)
+                    ? JSON.parse(JSON.stringify(fieldSchema.default))
+                    : fieldSchema.default;
+            }
+        } else {
+            if (key === 'bot_token') {
+                newBotSettings[key] = `${botName.toUpperCase().replace(/[^A-Z0-9_]/g, '_')}_BOT_TOKEN`;
+            } else {
+                 newBotSettings[key] = (typeof schemaEntry.default === 'object' && schemaEntry.default !== null)
+                    ? JSON.parse(JSON.stringify(schemaEntry.default))
+                    : schemaEntry.default;
+            }
+        }
     }
-};
+    return newBotSettings;
+}
+
 
 function ensureSettingsExist(modelName) {
+    const globalSchema = settingsSchema._global;
     if (!settings[modelName] || typeof settings[modelName] !== 'object') {
-        settings[modelName] = JSON.parse(JSON.stringify(defaultSettings));
-        settings[modelName].bot_token = `${modelName.toUpperCase().replace(/[^A-Z0-9_]/g, '_')}_BOT_TOKEN`;
+        settings[modelName] = createBotConfigFromSchema(modelName);
     }
     const botData = settings[modelName];
+
+    for (const key in globalSchema) {
+        const schemaEntry = globalSchema[key];
+        if (schemaEntry.fields) {
+            if (!botData.hasOwnProperty(key) || typeof botData[key] !== 'object' || botData[key] === null) {
+                botData[key] = {};
+                for (const fieldKey in schemaEntry.fields) {
+                     const fieldSchema = schemaEntry.fields[fieldKey];
+                     botData[key][fieldKey] = (typeof fieldSchema.default === 'object' && fieldSchema.default !== null)
+                        ? JSON.parse(JSON.stringify(fieldSchema.default))
+                        : fieldSchema.default;
+                }
+            } else {
+                 for (const fieldKey in schemaEntry.fields) {
+                    const fieldSchema = schemaEntry.fields[fieldKey];
+                    if (!botData[key].hasOwnProperty(fieldKey) ||
+                        (fieldSchema.type === 'array' && !Array.isArray(botData[key][fieldKey])) ||
+                        (fieldSchema.type === 'dictionary' && (typeof botData[key][fieldKey] !== 'object' || botData[key][fieldKey] === null || Array.isArray(botData[key][fieldKey])))
+                    ) {
+                        botData[key][fieldKey] = (typeof fieldSchema.default === 'object' && fieldSchema.default !== null)
+                            ? JSON.parse(JSON.stringify(fieldSchema.default))
+                            : fieldSchema.default;
+                    }
+                    if ((fieldKey === 'backup_models' || fieldKey === 'stop' || fieldKey === 'monitored_servers' || fieldKey === 'monitored_channels' || fieldKey === 'admins' || fieldKey === 'partial_ignore_list' || fieldKey === 'full_ignore_list') && !Array.isArray(botData[key][fieldKey])) {
+                        botData[key][fieldKey] = JSON.parse(JSON.stringify(fieldSchema.default || []));
+                    }
+                    if (fieldKey === 'dictionary_cache' && (typeof botData[key][fieldKey] !== 'object' || botData[key][fieldKey] === null || Array.isArray(botData[key][fieldKey]))) {
+                         botData[key][fieldKey] = JSON.parse(JSON.stringify(fieldSchema.default || {}));
+                    }
+                     if (fieldKey === 'typing_delay_range' && (!Array.isArray(botData[key][fieldKey]) || botData[key][fieldKey].length !==2 )) {
+                         botData[key][fieldKey] = JSON.parse(JSON.stringify(fieldSchema.default || [0,0]));
+                    }
+                }
+            }
+        } else {
+            if (!botData.hasOwnProperty(key)) {
+                if (key === 'bot_token') {
+                     botData[key] = `${modelName.toUpperCase().replace(/[^A-Z0-9_]/g, '_')}_BOT_TOKEN`;
+                } else {
+                    botData[key] = (typeof schemaEntry.default === 'object' && schemaEntry.default !== null)
+                        ? JSON.parse(JSON.stringify(schemaEntry.default))
+                        : schemaEntry.default;
+                }
+            }
+        }
+    }
 
     if (botData.bot_settings && botData.bot_settings.enabled !== undefined) {
         botData.enabled = botData.bot_settings.enabled;
         delete botData.bot_settings;
     }
-    if (botData.enabled === undefined) {
-        botData.enabled = defaultSettings.enabled;
-    }
 
-    if (!botData.bot_token || botData.bot_token === "BOT_TOKEN" || botData.bot_token === defaultSettings.bot_token) {
-        botData.bot_token = `${modelName.toUpperCase().replace(/[^A-Z0-9_]/g, '_')}_BOT_TOKEN`;
+    const botTokenSchemaEntry = globalSchema.bot_token;
+    if (botData.bot_token === "BOT_TOKEN" || (botTokenSchemaEntry && botData.bot_token === botTokenSchemaEntry.default)) {
+         botData.bot_token = `${modelName.toUpperCase().replace(/[^A-Z0-9_]/g, '_')}_BOT_TOKEN`;
     } else if (typeof botData.bot_token === 'string' && botData.bot_token.startsWith('ENV:')) {
         botData.bot_token = botData.bot_token.substring(4);
     }
 
-    if (typeof botData.prompt_settings !== 'object' || botData.prompt_settings === null) {
-        botData.prompt_settings = JSON.parse(JSON.stringify(defaultSettings.prompt_settings));
-    }
-    if (botData.prompt_settings.hasOwnProperty('dictionary')) {
-        if (!botData.prompt_settings.hasOwnProperty('dictionary_cache')) {
-            botData.prompt_settings.dictionary_cache = botData.prompt_settings.dictionary;
-        }
-        delete botData.prompt_settings.dictionary;
-    }
-    if (botData.prompt_settings.hasOwnProperty('dictionary_header')) {
-        if (!botData.prompt_settings.hasOwnProperty('dictionary_cache_header')) {
-            botData.prompt_settings.dictionary_cache_header = botData.prompt_settings.dictionary_header;
-        }
-        delete botData.prompt_settings.dictionary_header;
-    }
-    if (typeof botData.prompt_settings.dictionary_cache !== 'object' || botData.prompt_settings.dictionary_cache === null) {
-        botData.prompt_settings.dictionary_cache = defaultSettings.prompt_settings.dictionary_cache !== undefined
-            ? JSON.parse(JSON.stringify(defaultSettings.prompt_settings.dictionary_cache))
-            : {};
-    }
-    if (typeof botData.prompt_settings.dictionary_cache_header !== 'string') {
-        botData.prompt_settings.dictionary_cache_header = defaultSettings.prompt_settings.dictionary_cache_header !== undefined
-            ? defaultSettings.prompt_settings.dictionary_cache_header
-            : "";
-    }
 
-    if (typeof botData.llm_settings !== 'object' || botData.llm_settings === null) {
-        botData.llm_settings = JSON.parse(JSON.stringify(defaultSettings.llm_settings));
-    }
-
-    let llmTempProvider = botData.llm_settings.provider;
-    let llmTempEndpoint = botData.llm_settings.endpoint;
-    let llmTempModel = botData.llm_settings.model;
-
-    if (botData.llm_settings.hasOwnProperty('llm_provider')) {
-        if (llmTempProvider === undefined) llmTempProvider = botData.llm_settings.llm_provider;
-        delete botData.llm_settings.llm_provider;
-    }
-    if (botData.llm_settings.hasOwnProperty('llm_endpoint')) {
-        if (llmTempEndpoint === undefined) llmTempEndpoint = botData.llm_settings.llm_endpoint;
-        delete botData.llm_settings.llm_endpoint;
-    }
-    if (botData.llm_settings.hasOwnProperty('llm_model')) {
-        if (llmTempModel === undefined) llmTempModel = botData.llm_settings.llm_model;
-        delete botData.llm_settings.llm_model;
-    }
-
-    if (botData.hasOwnProperty('llm_provider')) {
-        if (llmTempProvider === undefined) llmTempProvider = botData.llm_provider;
-        delete botData.llm_provider;
-    }
-    if (botData.hasOwnProperty('llm_endpoint')) {
-        if (llmTempEndpoint === undefined) llmTempEndpoint = botData.llm_endpoint;
-        delete botData.llm_endpoint;
-    }
-    if (botData.hasOwnProperty('llm_model')) {
-        if (llmTempModel === undefined) llmTempModel = botData.llm_model;
-        delete botData.llm_model;
-    }
-
-    botData.llm_settings.provider = llmTempProvider;
-    botData.llm_settings.endpoint = llmTempEndpoint;
-    botData.llm_settings.model = llmTempModel;
-
-    if (typeof botData.llm_settings.model === 'string' && botData.llm_settings.provider === undefined) {
-        const oldModelIdOrName = botData.llm_settings.model;
-        let migrated = false;
-        for (const pName in modelOptions) {
-            for (const epUrl in modelOptions[pName]) {
-                const modelsAtEndpoint = modelOptions[pName][epUrl];
-                if (Object.values(modelsAtEndpoint).includes(oldModelIdOrName)) {
-                    botData.llm_settings.provider = pName; botData.llm_settings.endpoint = epUrl; botData.llm_settings.model = oldModelIdOrName; migrated = true; break;
-                }
-                if (modelsAtEndpoint[oldModelIdOrName]) {
-                    botData.llm_settings.provider = pName; botData.llm_settings.endpoint = epUrl; botData.llm_settings.model = modelsAtEndpoint[oldModelIdOrName]; migrated = true; break;
-                }
+    if (botData.prompt_settings) {
+        if (botData.prompt_settings.hasOwnProperty('dictionary')) {
+            if (!botData.prompt_settings.hasOwnProperty('dictionary_cache')) {
+                botData.prompt_settings.dictionary_cache = botData.prompt_settings.dictionary;
             }
-            if (migrated) break;
+            delete botData.prompt_settings.dictionary;
         }
-        if (!migrated) {
-            botData.llm_settings.provider = defaultSettings.llm_settings.provider;
-            botData.llm_settings.endpoint = defaultSettings.llm_settings.endpoint;
-            botData.llm_settings.model = defaultSettings.llm_settings.model;
+        if (botData.prompt_settings.hasOwnProperty('dictionary_header')) {
+            if (!botData.prompt_settings.hasOwnProperty('dictionary_cache_header')) {
+                botData.prompt_settings.dictionary_cache_header = botData.prompt_settings.dictionary_header;
+            }
+            delete botData.prompt_settings.dictionary_header;
         }
     }
 
-    if (botData.llm_settings.provider === undefined) botData.llm_settings.provider = defaultSettings.llm_settings.provider;
-    if (botData.llm_settings.endpoint === undefined) botData.llm_settings.endpoint = defaultSettings.llm_settings.endpoint;
-    if (botData.llm_settings.model === undefined) botData.llm_settings.model = defaultSettings.llm_settings.model;
+    if (botData.llm_settings) {
+        let llmTempProvider = botData.llm_settings.provider;
+        let llmTempEndpoint = botData.llm_settings.endpoint;
+        let llmTempModel = botData.llm_settings.model;
+
+        if (botData.llm_settings.hasOwnProperty('llm_provider')) {
+            if (llmTempProvider === undefined || llmTempProvider === globalSchema.llm_settings.fields.provider.default) llmTempProvider = botData.llm_settings.llm_provider;
+            delete botData.llm_settings.llm_provider;
+        }
+        if (botData.llm_settings.hasOwnProperty('llm_endpoint')) {
+            if (llmTempEndpoint === undefined || llmTempEndpoint === globalSchema.llm_settings.fields.endpoint.default) llmTempEndpoint = botData.llm_settings.llm_endpoint;
+            delete botData.llm_settings.llm_endpoint;
+        }
+        if (botData.llm_settings.hasOwnProperty('llm_model')) {
+            if (llmTempModel === undefined || llmTempModel === globalSchema.llm_settings.fields.model.default) llmTempModel = botData.llm_settings.llm_model;
+            delete botData.llm_settings.llm_model;
+        }
+        if (botData.hasOwnProperty('llm_provider')) {
+            if (llmTempProvider === undefined || llmTempProvider === globalSchema.llm_settings.fields.provider.default) llmTempProvider = botData.llm_provider;
+            delete botData.llm_provider;
+        }
+        if (botData.hasOwnProperty('llm_endpoint')) {
+            if (llmTempEndpoint === undefined || llmTempEndpoint === globalSchema.llm_settings.fields.endpoint.default) llmTempEndpoint = botData.llm_endpoint;
+            delete botData.llm_endpoint;
+        }
+        if (botData.hasOwnProperty('llm_model')) {
+            if (llmTempModel === undefined || llmTempModel === globalSchema.llm_settings.fields.model.default) llmTempModel = botData.llm_model;
+            delete botData.llm_model;
+        }
+
+        botData.llm_settings.provider = llmTempProvider;
+        botData.llm_settings.endpoint = llmTempEndpoint;
+        botData.llm_settings.model = llmTempModel;
+
+        if (typeof botData.llm_settings.model === 'string' &&
+            (botData.llm_settings.provider === undefined || botData.llm_settings.provider === globalSchema.llm_settings.fields.provider.default ||
+             botData.llm_settings.endpoint === undefined || botData.llm_settings.endpoint === globalSchema.llm_settings.fields.endpoint.default)
+           ) {
+            const oldModelIdOrName = botData.llm_settings.model;
+            let migrated = false;
+            for (const pName in modelOptions) {
+                for (const epUrl in modelOptions[pName]) {
+                    const modelsAtEndpoint = modelOptions[pName][epUrl];
+                    if (Object.values(modelsAtEndpoint).includes(oldModelIdOrName)) {
+                        botData.llm_settings.provider = pName; botData.llm_settings.endpoint = epUrl; botData.llm_settings.model = oldModelIdOrName; migrated = true; break;
+                    }
+                    if (modelsAtEndpoint[oldModelIdOrName]) {
+                        botData.llm_settings.provider = pName; botData.llm_settings.endpoint = epUrl; botData.llm_settings.model = modelsAtEndpoint[oldModelIdOrName]; migrated = true; break;
+                    }
+                }
+                if (migrated) break;
+            }
+            if (!migrated) {
+                botData.llm_settings.provider = globalSchema.llm_settings.fields.provider.default;
+                botData.llm_settings.endpoint = globalSchema.llm_settings.fields.endpoint.default;
+                botData.llm_settings.model = globalSchema.llm_settings.fields.model.default;
+            }
+        }
+    }
 
     if (botData.response_limits && botData.response_limits.vision_enabled !== undefined) {
-        if (typeof botData.vision_settings !== 'object' || botData.vision_settings === null) {
-            botData.vision_settings = JSON.parse(JSON.stringify(defaultSettings.vision_settings));
+        if (!botData.vision_settings || typeof botData.vision_settings !== 'object') {
+            botData.vision_settings = {};
+            for (const fieldKey in globalSchema.vision_settings.fields) {
+                 botData.vision_settings[fieldKey] = JSON.parse(JSON.stringify(globalSchema.vision_settings.fields[fieldKey].default));
+            }
         }
         botData.vision_settings.vision_enabled = botData.response_limits.vision_enabled;
         delete botData.response_limits.vision_enabled;
     }
 
-    if (typeof botData.vision_settings !== 'object' || botData.vision_settings === null) {
-        botData.vision_settings = JSON.parse(JSON.stringify(defaultSettings.vision_settings));
-    } else {
+    if (botData.vision_settings) {
         if (botData.vision_settings.hasOwnProperty('vision_models') && !botData.vision_settings.hasOwnProperty('backup_models')) {
             botData.vision_settings.backup_models = botData.vision_settings.vision_models;
             delete botData.vision_settings.vision_models;
         }
-    }
-    if (botData.vision_settings.backup_models === undefined) {
-        botData.vision_settings.backup_models = JSON.parse(JSON.stringify(defaultSettings.vision_settings.backup_models || []));
-    } else if (!Array.isArray(botData.vision_settings.backup_models)) {
-        botData.vision_settings.backup_models = JSON.parse(JSON.stringify(defaultSettings.vision_settings.backup_models || []));
-    }
 
-    let visionTempProvider = botData.vision_settings.provider;
-    let visionTempEndpoint = botData.vision_settings.endpoint;
-    let visionTempModel = botData.vision_settings.model;
+        let visionTempProvider = botData.vision_settings.provider;
+        let visionTempEndpoint = botData.vision_settings.endpoint;
+        let visionTempModel = botData.vision_settings.model;
 
-    if (botData.vision_settings.hasOwnProperty('vision_provider')) {
-        if (visionTempProvider === undefined) visionTempProvider = botData.vision_settings.vision_provider;
-        delete botData.vision_settings.vision_provider;
-    }
-    if (botData.vision_settings.hasOwnProperty('vision_endpoint')) {
-        if (visionTempEndpoint === undefined) visionTempEndpoint = botData.vision_settings.vision_endpoint;
-        delete botData.vision_settings.vision_endpoint;
-    }
-    if (botData.vision_settings.hasOwnProperty('vision_model')) {
-        if (visionTempModel === undefined) visionTempModel = botData.vision_settings.vision_model;
-        delete botData.vision_settings.vision_model;
-    }
-
-    botData.vision_settings.provider = visionTempProvider;
-    botData.vision_settings.endpoint = visionTempEndpoint;
-    botData.vision_settings.model = visionTempModel;
-
-    if (botData.vision_settings && typeof botData.vision_settings.model === 'string' && botData.vision_settings.provider === undefined) {
-        const oldVisionModelIdOrName = botData.vision_settings.model;
-        let migratedVision = false;
-        for (const pName in visionOptions) {
-            for (const epUrl in visionOptions[pName]) {
-                const modelsAtEndpoint = visionOptions[pName][epUrl];
-                if (Object.values(modelsAtEndpoint).includes(oldVisionModelIdOrName)) {
-                    botData.vision_settings.provider = pName; botData.vision_settings.endpoint = epUrl; botData.vision_settings.model = oldVisionModelIdOrName; migratedVision = true; break;
-                }
-                if (modelsAtEndpoint[oldVisionModelIdOrName]) {
-                    botData.vision_settings.provider = pName; botData.vision_settings.endpoint = epUrl; botData.vision_settings.model = modelsAtEndpoint[oldVisionModelIdOrName]; migratedVision = true; break;
-                }
-            }
-            if (migratedVision) break;
+        if (botData.vision_settings.hasOwnProperty('vision_provider')) {
+            if (visionTempProvider === undefined || visionTempProvider === globalSchema.vision_settings.fields.provider.default) visionTempProvider = botData.vision_settings.vision_provider;
+            delete botData.vision_settings.vision_provider;
         }
-        if (!migratedVision) {
-            botData.vision_settings.provider = defaultSettings.vision_settings.provider;
-            botData.vision_settings.endpoint = defaultSettings.vision_settings.endpoint;
-            botData.vision_settings.model = defaultSettings.vision_settings.model;
+        if (botData.vision_settings.hasOwnProperty('vision_endpoint')) {
+            if (visionTempEndpoint === undefined || visionTempEndpoint === globalSchema.vision_settings.fields.endpoint.default) visionTempEndpoint = botData.vision_settings.vision_endpoint;
+            delete botData.vision_settings.vision_endpoint;
         }
-    }
+        if (botData.vision_settings.hasOwnProperty('vision_model')) {
+            if (visionTempModel === undefined || visionTempModel === globalSchema.vision_settings.fields.model.default) visionTempModel = botData.vision_settings.vision_model;
+            delete botData.vision_settings.vision_model;
+        }
 
-    const visionDefaults = defaultSettings.vision_settings || {};
-    for (const key in visionDefaults) {
-        if (botData.vision_settings[key] === undefined) {
-            botData.vision_settings[key] = JSON.parse(JSON.stringify(visionDefaults[key]));
-        }
-    }
-    if (botData.vision_settings.vision_enabled && botData.vision_settings.provider === undefined) {
-        const inferredVision = getFirstProviderAndModelDetails(true);
-        botData.vision_settings.provider = inferredVision.provider ?? defaultSettings.vision_settings.provider;
-        botData.vision_settings.endpoint = inferredVision.endpoint ?? defaultSettings.vision_settings.endpoint;
-        botData.vision_settings.model = inferredVision.model ?? defaultSettings.vision_settings.model;
-    }
+        botData.vision_settings.provider = visionTempProvider;
+        botData.vision_settings.endpoint = visionTempEndpoint;
+        botData.vision_settings.model = visionTempModel;
 
-    const defaultCategories = Object.keys(defaultSettings);
-    for (const category of defaultCategories) {
-        if (category === 'enabled' || category === 'bot_token') {
-            continue;
-        }
-        if (typeof defaultSettings[category] === 'object' && defaultSettings[category] !== null) {
-            if (typeof botData[category] !== 'object' || botData[category] === null) {
-                botData[category] = JSON.parse(JSON.stringify(defaultSettings[category]));
-            } else {
-                for (const key in defaultSettings[category]) {
-                    if ( (category === 'llm_settings' || category === 'vision_settings') &&
-                         (key === 'provider' || key === 'endpoint' || key === 'model') ) {
-                        if (botData[category][key] === undefined) {
-                                botData[category][key] = JSON.parse(JSON.stringify(defaultSettings[category][key]));
-                        }
-                        continue;
+        if (botData.vision_settings.vision_enabled && typeof botData.vision_settings.model === 'string' &&
+            (botData.vision_settings.provider === undefined || botData.vision_settings.provider === globalSchema.vision_settings.fields.provider.default ||
+             botData.vision_settings.endpoint === undefined || botData.vision_settings.endpoint === globalSchema.vision_settings.fields.endpoint.default )
+           ) {
+            const oldVisionModelIdOrName = botData.vision_settings.model;
+            let migratedVision = false;
+            for (const pName in visionOptions) {
+                for (const epUrl in visionOptions[pName]) {
+                    const modelsAtEndpoint = visionOptions[pName][epUrl];
+                    if (Object.values(modelsAtEndpoint).includes(oldVisionModelIdOrName)) {
+                        botData.vision_settings.provider = pName; botData.vision_settings.endpoint = epUrl; botData.vision_settings.model = oldVisionModelIdOrName; migratedVision = true; break;
                     }
-                    if (botData[category][key] === undefined) {
-                        botData[category][key] = JSON.parse(JSON.stringify(defaultSettings[category][key]));
-                    }
-                    if (Array.isArray(defaultSettings[category][key]) && !Array.isArray(botData[category][key])) {
-                        botData[category][key] = JSON.parse(JSON.stringify(defaultSettings[category][key]));
+                    if (modelsAtEndpoint[oldVisionModelIdOrName]) {
+                        botData.vision_settings.provider = pName; botData.vision_settings.endpoint = epUrl; botData.vision_settings.model = modelsAtEndpoint[oldVisionModelIdOrName]; migratedVision = true; break;
                     }
                 }
+                if (migratedVision) break;
             }
-        } else {
-            if (botData[category] === undefined) {
-                botData[category] = defaultSettings[category];
+             if (!migratedVision) {
+                botData.vision_settings.provider = globalSchema.vision_settings.fields.provider.default;
+                botData.vision_settings.endpoint = globalSchema.vision_settings.fields.endpoint.default;
+                botData.vision_settings.model = globalSchema.vision_settings.fields.model.default;
             }
+        }
+        if (botData.vision_settings.vision_enabled && (botData.vision_settings.provider === undefined || botData.vision_settings.provider === null)) {
+            botData.vision_settings.provider = globalSchema.vision_settings.fields.provider.default;
+            botData.vision_settings.endpoint = globalSchema.vision_settings.fields.endpoint.default;
+            botData.vision_settings.model = globalSchema.vision_settings.fields.model.default;
         }
     }
 
-    const arrayFieldsPaths = [
-        "llm_settings.backup_models", "llm_settings.stop",
-        "vision_settings.backup_models",
-        "response_limits.monitored_channels", "response_limits.admins", "response_limits.partial_ignore_list", "response_limits.full_ignore_list"
-    ];
-    for (const path of arrayFieldsPaths) {
-        const parts = path.split('.');
-        let current = botData;
-        for (let i = 0; i < parts.length - 1; i++) {
-            if (typeof current[parts[i]] !== 'object' || current[parts[i]] === null) { current = null; break;}
-            current = current[parts[i]];
-        }
-        if (current && typeof current === 'object' && !Array.isArray(current[parts[parts.length - 1]])) {
-            current[parts[parts.length - 1]] = [];
-        }
-    }
-    if (botData.prompt_settings && (typeof botData.prompt_settings.dictionary_cache !== 'object' || botData.prompt_settings.dictionary_cache === null) ) {
-        botData.prompt_settings.dictionary_cache = {};
-    }
-
-    const allKnownKeys = new Set(Object.keys(defaultSettings));
-    Object.keys(settingsSchema._global).forEach(k => allKnownKeys.add(k));
+    const allKnownTopLevelKeys = new Set();
+    for(const k in globalSchema) allKnownTopLevelKeys.add(k);
 
     for (const key in botData) {
-        if (!allKnownKeys.has(key)) {
-            if (!defaultSettings.hasOwnProperty(key) && !settingsSchema._global.hasOwnProperty(key)) {
-            }
-        } else if (typeof defaultSettings[key] === 'object' && defaultSettings[key] !== null && typeof botData[key] === 'object' && botData[key] !== null) {
-            const defaultCategoryKeys = new Set(Object.keys(defaultSettings[key]));
-            if (settingsSchema._global[key]) {
-                    Object.keys(settingsSchema._global[key]).forEach(sk => defaultCategoryKeys.add(sk));
-            }
+        if (!allKnownTopLevelKeys.has(key)) {
+            delete botData[key];
+        } else if (globalSchema[key] && globalSchema[key].fields && typeof botData[key] === 'object' && botData[key] !== null) {
+            const knownCategoryFields = new Set(Object.keys(globalSchema[key].fields));
             for (const subKey in botData[key]) {
-                if (!defaultCategoryKeys.has(subKey)) {
+                if (!knownCategoryFields.has(subKey)) {
                     delete botData[key][subKey];
                 }
             }
         }
     }
 }
+
 
 async function updateBotToken(modelName, tokenValue) {
     const tokenKeyForEnv = `${modelName.toUpperCase().replace(/[^A-Z0-9_]/g, '_')}_BOT_TOKEN`;
@@ -523,7 +375,8 @@ function renderModelContent(modelName) {
     const botTokenCol = document.createElement('div');
     botTokenCol.className = 'form-col';
     const botTokenFormGroup = document.createElement('div'); botTokenFormGroup.className = 'form-group';
-    const botTokenInputContainer = createTextInput(modelName, null, 'bot_token', modelData.bot_token, settingsSchema._global.bot_token);
+    const botTokenSchema = settingsSchema._global.bot_token;
+    const botTokenInputContainer = createTextInput(modelName, null, 'bot_token', modelData.bot_token, botTokenSchema);
     const botTokenField = botTokenInputContainer.querySelector('input, textarea');
     if (botTokenField) {
         botTokenField.onchange = async function() { if (this.value.trim() === '') return; await updateBotToken(modelName, this.value); this.value = ''; this.placeholder = settings[modelName].bot_token; };
@@ -567,12 +420,12 @@ function renderModelContent(modelName) {
     modelSection.appendChild(topConfigSection);
 
     const categoryRenderOrder = Object.keys(settingsSchema._global).filter(key =>
-        key !== 'enabled' && key !== 'bot_token'
+        settingsSchema._global[key].fields && key !== 'enabled' && key !== 'bot_token'
     );
 
-    for (const category of categoryRenderOrder) {
-        const categorySchema = settingsSchema._global[category];
-        const categoryData = modelData[category] || {};
+    for (const categoryKey of categoryRenderOrder) {
+        const categoryDefinition = settingsSchema._global[categoryKey];
+        const categoryData = modelData[categoryKey] || {};
 
         const categorySectionDiv = document.createElement('div');
         categorySectionDiv.className = 'section';
@@ -593,7 +446,7 @@ function renderModelContent(modelName) {
         headerTitle.style.display = 'flex';
         headerTitle.style.justifyContent = 'space-between';
         headerTitle.style.alignItems = 'center';
-        headerTitle.innerHTML = `${formatCategoryName(category)} <span class="toggle-icon" style="color: inherit;">▼</span>`;
+        headerTitle.innerHTML = `${categoryDefinition.title || formatCategoryName(categoryKey)} <span class="toggle-icon" style="color: inherit;">▼</span>`;
         headerDiv.appendChild(headerTitle);
 
         const contentDiv = document.createElement('div');
@@ -603,7 +456,7 @@ function renderModelContent(modelName) {
         categorySectionDiv.appendChild(contentDiv);
         modelSection.appendChild(categorySectionDiv);
 
-        const sectionKey = `${modelName}-${category}`;
+        const sectionKey = `${modelName}-${categoryKey}`;
         const mainSectionIcon = headerTitle.querySelector('.toggle-icon');
 
         if (collapsedSections[sectionKey] === undefined) {
@@ -622,9 +475,9 @@ function renderModelContent(modelName) {
         };
 
         let currentFieldsInRow = 0; let currentRowElement = null;
-        const fieldOrder = Object.keys(categorySchema);
+        const fieldOrder = Object.keys(categoryDefinition.fields);
 
-        if (category === 'llm_settings') {
+        if (categoryKey === 'llm_settings') {
             const primaryLLMTitle = document.createElement('h4'); primaryLLMTitle.textContent = "Primary LLM Configuration"; primaryLLMTitle.style.marginTop = "0px"; primaryLLMTitle.style.marginBottom = "10px";
             contentDiv.appendChild(primaryLLMTitle);
 
@@ -635,19 +488,19 @@ function renderModelContent(modelName) {
             const backupLLMTitle = document.createElement('h4'); backupLLMTitle.textContent = "LLM Backup Models"; backupLLMTitle.style.marginTop = "20px";
             contentDiv.appendChild(backupLLMTitle);
 
-            const llmBackupSchema = categorySchema.backup_models;
+            const llmBackupSchema = categoryDefinition.fields.backup_models;
             if (llmBackupSchema) {
                 const backupFormGroup = document.createElement('div'); backupFormGroup.className = 'form-group';
-                backupFormGroup.appendChild(createArrayInput(modelName, category, 'backup_models', categoryData.backup_models || [], llmBackupSchema));
+                backupFormGroup.appendChild(createArrayInput(modelName, categoryKey, 'backup_models', categoryData.backup_models || [], llmBackupSchema));
                 contentDiv.appendChild(backupFormGroup);
             }
             const otherLLMSettingsTitle = document.createElement('h4'); otherLLMSettingsTitle.textContent = "Other LLM Parameters"; otherLLMSettingsTitle.style.marginTop = "20px";
             contentDiv.appendChild(otherLLMSettingsTitle);
         }
 
-        if (category === 'vision_settings') {
+        if (categoryKey === 'vision_settings') {
             const visionEnabledGroup = document.createElement('div'); visionEnabledGroup.className = 'form-group';
-            visionEnabledGroup.appendChild(createBooleanInput(modelName, category, 'vision_enabled', categoryData.vision_enabled, categorySchema.vision_enabled));
+            visionEnabledGroup.appendChild(createBooleanInput(modelName, categoryKey, 'vision_enabled', categoryData.vision_enabled, categoryDefinition.fields.vision_enabled));
             contentDiv.appendChild(visionEnabledGroup);
 
             const primaryVisionTitle = document.createElement('h4'); primaryVisionTitle.textContent = "Primary Vision Model"; primaryVisionTitle.style.marginTop = "0px"; primaryVisionTitle.style.marginBottom = "10px";
@@ -661,10 +514,10 @@ function renderModelContent(modelName) {
             additionalVisionModelsTitle.style.marginTop = "20px";
             contentDiv.appendChild(additionalVisionModelsTitle);
 
-            const visionBackupModelsSchema = categorySchema.backup_models;
+            const visionBackupModelsSchema = categoryDefinition.fields.backup_models;
             if (visionBackupModelsSchema) {
                 const visionModelsFormGroup = document.createElement('div'); visionModelsFormGroup.className = 'form-group';
-                visionModelsFormGroup.appendChild(createArrayInput(modelName, 'vision_settings', 'backup_models', categoryData.backup_models || [], visionBackupModelsSchema));
+                visionModelsFormGroup.appendChild(createArrayInput(modelName, categoryKey, 'backup_models', categoryData.backup_models || [], visionBackupModelsSchema));
                 contentDiv.appendChild(visionModelsFormGroup);
             }
             const otherVisionSettingsTitle = document.createElement('h4'); otherVisionSettingsTitle.textContent = "Other Vision Parameters"; otherVisionSettingsTitle.style.marginTop = "20px";
@@ -672,12 +525,13 @@ function renderModelContent(modelName) {
         }
 
         for (const settingKey of fieldOrder) {
-            if (categorySchema[settingKey].hidden) continue;
-            if (category === 'llm_settings' && (settingKey === 'provider' || settingKey === 'endpoint' || settingKey === 'model' || settingKey === 'backup_models')) continue;
-            if (category === 'vision_settings' && (settingKey === 'provider' || settingKey === 'endpoint' || settingKey === 'model' || settingKey === 'backup_models' || settingKey === 'vision_enabled')) continue;
+            const schemaForItem = categoryDefinition.fields[settingKey];
+            if (schemaForItem.hidden) continue;
+            if (categoryKey === 'llm_settings' && (settingKey === 'provider' || settingKey === 'endpoint' || settingKey === 'model' || settingKey === 'backup_models')) continue;
+            if (categoryKey === 'vision_settings' && (settingKey === 'provider' || settingKey === 'endpoint' || settingKey === 'model' || settingKey === 'backup_models' || settingKey === 'vision_enabled')) continue;
 
-            if (category === 'prompt_settings' && settingKey === 'dictionary_cache') {
-                const dictCacheSchema = categorySchema[settingKey];
+            if (schemaForItem.type === 'dictionary') {
+                const dictCacheSchema = schemaForItem;
                 const dictCacheData = categoryData[settingKey] || {};
 
                 const dictCollapsibleContainer = document.createElement('div');
@@ -700,13 +554,27 @@ function renderModelContent(modelName) {
                 dictHeaderTitle.style.display = 'flex';
                 dictHeaderTitle.style.justifyContent = 'space-between';
                 dictHeaderTitle.style.alignItems = 'center';
-                dictHeaderTitle.innerHTML = `${formatSettingName(settingKey)} <span class="toggle-icon" style="color: inherit;">▼</span>`;
+                const leftContentContainer = document.createElement('span');
+                leftContentContainer.style.display = 'flex';
+                leftContentContainer.style.alignItems = 'center';
+                const titleTextNode = document.createTextNode(dictCacheSchema.title || formatSettingName(settingKey));
+                leftContentContainer.appendChild(titleTextNode);
+                if (dictCacheSchema.tooltip) {
+                const tooltipElement = createTooltip(dictCacheSchema.tooltip);
+                leftContentContainer.appendChild(tooltipElement);
+                }
+                dictHeaderTitle.appendChild(leftContentContainer);
+                const toggleIconSpan = document.createElement('span');
+                toggleIconSpan.className = 'toggle-icon';
+                toggleIconSpan.innerHTML = '▼';
+                dictHeaderTitle.appendChild(toggleIconSpan);
+
                 dictHeaderDiv.appendChild(dictHeaderTitle);
 
                 const dictContentElement = document.createElement('div');
                 dictContentElement.className = 'collapsible-content';
 
-                const dictSectionKey = `${modelName}-${category}-${settingKey}-collapsible`;
+                const dictSectionKey = `${modelName}-${categoryKey}-${settingKey}-collapsible`;
                 const dictIconElement = dictHeaderTitle.querySelector('.toggle-icon');
 
                 if (collapsedSections[dictSectionKey] === undefined) {
@@ -727,7 +595,7 @@ function renderModelContent(modelName) {
                 const dictInputGroup = document.createElement('div');
                 dictInputGroup.className = 'form-group';
                 dictInputGroup.style.padding = '10px';
-                dictInputGroup.appendChild(createDictionaryInput(modelName, category, settingKey, dictCacheData, {...dictCacheSchema, isSubComponent: true}));
+                dictInputGroup.appendChild(createDictionaryInput(modelName, categoryKey, settingKey, dictCacheData, {...dictCacheSchema, isSubComponent: true}));
                 dictContentElement.appendChild(dictInputGroup);
 
                 dictCollapsibleContainer.appendChild(dictHeaderDiv);
@@ -738,7 +606,7 @@ function renderModelContent(modelName) {
                 continue;
             }
 
-            const settingValue = categoryData[settingKey]; const schemaForItem = categorySchema[settingKey];
+            const settingValue = categoryData[settingKey];
             let formGroup = document.createElement('div');
             let fieldRendered = true;
             const isSmallNumberField = schemaForItem.type === 'number' &&
@@ -760,19 +628,20 @@ function renderModelContent(modelName) {
             }
 
             if (schemaForItem.type === 'array') {
-                formGroup.appendChild(createArrayInput(modelName, category, settingKey, settingValue || [], schemaForItem));
+                formGroup.appendChild(createArrayInput(modelName, categoryKey, settingKey, settingValue, schemaForItem));
             } else if (schemaForItem.type === 'dictionary') {
-                formGroup.appendChild(createDictionaryInput(modelName, category, settingKey, settingValue || {}, schemaForItem));
+                formGroup.appendChild(createDictionaryInput(modelName, categoryKey, settingKey, settingValue, schemaForItem));
             } else if (schemaForItem.type === 'boolean') {
-                formGroup.appendChild(createBooleanInput(modelName, category, settingKey, !!settingValue, schemaForItem));
+                formGroup.appendChild(createBooleanInput(modelName, categoryKey, settingKey, !!settingValue, schemaForItem));
             } else if (schemaForItem.type === 'number') {
-                formGroup.appendChild(createNumberInputWithSchema(modelName, category, settingKey, Number(settingValue !== undefined ? settingValue : (schemaForItem.min !== undefined ? schemaForItem.min : 0)), schemaForItem));
+                formGroup.appendChild(createNumberInputWithSchema(modelName, categoryKey, settingKey, Number(settingValue !== undefined ? settingValue : schemaForItem.default), schemaForItem));
             } else if (schemaForItem.type === 'text') {
-                formGroup.appendChild(createTextInput(modelName, category, settingKey, String(settingValue || ''), schemaForItem));
+                formGroup.appendChild(createTextInput(modelName, categoryKey, settingKey, String(settingValue !== undefined ? settingValue : schemaForItem.default), schemaForItem));
             } else if (schemaForItem.type === 'range') {
-                const rangeValue = Array.isArray(settingValue) && settingValue.length === 2 ? settingValue : (defaultSettings[category]?.[settingKey] || [0,10]);
-                formGroup.appendChild(createRangeInput(modelName, category, settingKey, rangeValue, schemaForItem));
+                const rangeValue = Array.isArray(settingValue) && settingValue.length === 2 ? settingValue : schemaForItem.default;
+                formGroup.appendChild(createRangeInput(modelName, categoryKey, settingKey, rangeValue, schemaForItem));
             } else { fieldRendered = false; if(formGroup.parentNode && formGroup.parentNode === currentRowElement) {currentRowElement.removeChild(formGroup); currentFieldsInRow--;} else if(formGroup.parentNode){formGroup.parentNode.removeChild(formGroup);} }
+
 
             if (!fieldRendered && formGroup.className === 'form-col' && currentRowElement && currentRowElement.children.length === 0) {
                 if(currentRowElement.parentNode) currentRowElement.parentNode.removeChild(currentRowElement);
@@ -785,6 +654,7 @@ function renderModelContent(modelName) {
     }
     container.appendChild(modelSection);
 }
+
 
 function createProviderModelSelectors(modelName, settingsGroupKey, configObject, targetElement, isVisionSelectors = false) {
     targetElement.innerHTML = '';
@@ -896,7 +766,8 @@ function createTextInput(modelName, category, settingKey, settingValue, schema) 
     const container = document.createElement('div');
     const fieldId = category === null ? `${modelName}-${settingKey}` : `${modelName}-${category}-${settingKey}`;
     const labelContainer = document.createElement('div'); labelContainer.className = 'label-container';
-    const labelElement = document.createElement('label'); labelElement.setAttribute('for', fieldId); labelElement.textContent = formatSettingName(settingKey);
+    const labelElement = document.createElement('label'); labelElement.setAttribute('for', fieldId);
+    labelElement.textContent = (schema && schema.title) ? schema.title : formatSettingName(settingKey);
     labelContainer.appendChild(labelElement);
     if (schema && schema.tooltip) { labelContainer.appendChild(createTooltip(schema.tooltip)); }
     let inputElement;
@@ -904,16 +775,20 @@ function createTextInput(modelName, category, settingKey, settingValue, schema) 
     const isPasswordField = (settingKey === 'bot_token' && category === null);
     if (isMultiline) {
         inputElement = document.createElement('textarea');
-        const largeMultilineKeys = ['prompt_head', 'prompt_tail', 'dictionary_cache_header', 'reminder', 'vision_prompt'];
-        inputElement.className = largeMultilineKeys.includes(settingKey) ? 'large' : 'medium';
+        if (schema.textareaSize === 'large') {
+            inputElement.className = 'large';
+        } else {
+            inputElement.className = 'medium';
+        }
     } else {
         inputElement = document.createElement('input'); inputElement.type = isPasswordField ? 'password' : 'text';
     }
     inputElement.id = fieldId;
+    const valToSet = settingValue !== undefined ? settingValue : (schema && schema.default !== undefined ? schema.default : '');
     if (isPasswordField) {
-        inputElement.placeholder = String(settingValue || 'Enter token...'); inputElement.value = '';
+        inputElement.placeholder = String(valToSet || 'Enter token...'); inputElement.value = '';
     } else {
-        inputElement.value = String(settingValue || '');
+        inputElement.value = String(valToSet);
     }
     inputElement.onchange = function() { updateSetting(modelName, category, settingKey, this.value); };
     container.appendChild(labelContainer); container.appendChild(inputElement);
@@ -924,11 +799,12 @@ function createNumberInputWithSchema(modelName, category, settingKey, settingVal
     const container = document.createElement('div');
     const fieldId = `${modelName}-${category}-${settingKey}`;
     const labelContainer = document.createElement('div'); labelContainer.className = 'label-container';
-    const labelElement = document.createElement('label'); labelElement.setAttribute('for', fieldId); labelElement.textContent = formatSettingName(settingKey);
+    const labelElement = document.createElement('label'); labelElement.setAttribute('for', fieldId);
+    labelElement.textContent = (schema && schema.title) ? schema.title : formatSettingName(settingKey);
     labelContainer.appendChild(labelElement);
     if (schema && schema.tooltip) { labelContainer.appendChild(createTooltip(schema.tooltip)); }
     const inputElement = document.createElement('input'); inputElement.type = 'number'; inputElement.id = fieldId; inputElement.className = 'number-input';
-    inputElement.value = settingValue;
+    inputElement.value = settingValue !== undefined ? settingValue : (schema && schema.default !== undefined ? schema.default : 0);
     if (schema) {
         if (schema.min !== undefined) inputElement.min = schema.min;
         if (schema.max !== undefined) inputElement.max = schema.max;
@@ -945,7 +821,10 @@ function createNumberInputWithSchema(modelName, category, settingKey, settingVal
     };
     inputElement.onchange = function() {
         const validation = validateInput(this.value, schema);
-        const originalValue = settings[modelName]?.[category]?.[settingKey] !== undefined ? settings[modelName][category][settingKey] : (schema?.min !== undefined ? schema.min : 0);
+        const originalValue = settings[modelName]?.[category]?.[settingKey] !== undefined
+            ? settings[modelName][category][settingKey]
+            : (schema && schema.default !== undefined ? schema.default : (schema?.min !== undefined ? schema.min : 0));
+
         if (!validation.valid) {
             showNotification(validation.message || `Invalid input for ${settingKey}`, 'error');
             this.value = originalValue; this.classList.remove('invalid-input'); validationMessage.style.display = 'none'; return;
@@ -960,13 +839,15 @@ function createBooleanInput(modelName, category, settingKey, settingValue, schem
     const container = document.createElement('div');
     const fieldId = `${modelName}-${category}-${settingKey}`;
     const labelContainer = document.createElement('div'); labelContainer.className = 'label-container';
-    const labelElement = document.createElement('label'); labelElement.setAttribute('for', fieldId); labelElement.textContent = formatSettingName(settingKey);
+    const labelElement = document.createElement('label'); labelElement.setAttribute('for', fieldId);
+    labelElement.textContent = (schema && schema.title) ? schema.title : formatSettingName(settingKey);
     labelContainer.appendChild(labelElement);
     if (schema && schema.tooltip) { labelContainer.appendChild(createTooltip(schema.tooltip)); }
     const select = document.createElement('select'); select.id = fieldId;
+    const currentVal = settingValue !== undefined ? settingValue : (schema && schema.default !== undefined ? schema.default : false);
     ['True', 'False'].forEach(valStr => {
         const option = document.createElement('option'); option.value = valStr.toLowerCase(); option.textContent = valStr;
-        if ((valStr === 'True' && settingValue === true) || (valStr === 'False' && settingValue === false)) { option.selected = true; }
+        if ((valStr === 'True' && currentVal === true) || (valStr === 'False' && currentVal === false)) { option.selected = true; }
         select.appendChild(option);
     });
     select.onchange = function() { updateSetting(modelName, category, settingKey, this.value === 'true'); };
@@ -977,32 +858,101 @@ function createBooleanInput(modelName, category, settingKey, settingValue, schem
 function createRangeInput(modelName, category, settingKey, settingValue, schema) {
     const container = document.createElement('div');
     const fieldIdPrefix = `${modelName}-${category}-${settingKey}`;
-    const labelContainer = document.createElement('div'); labelContainer.className = 'label-container';
-    const rangeLabel = document.createElement('label'); rangeLabel.textContent = formatSettingName(settingKey);
-    labelContainer.appendChild(rangeLabel);
-    if (schema && schema.tooltip) { labelContainer.appendChild(createTooltip(schema.tooltip)); }
+
+    const labelContainer = document.createElement('div');
+    labelContainer.className = 'label-container';
+    const rangeTitleLabel = document.createElement('label');
+    rangeTitleLabel.textContent = (schema && schema.title) ? schema.title : formatSettingName(settingKey);
+    labelContainer.appendChild(rangeTitleLabel);
+    if (schema && schema.tooltip) {
+        labelContainer.appendChild(createTooltip(schema.tooltip));
+    }
     container.appendChild(labelContainer);
-    const rangeContainer = document.createElement('div'); rangeContainer.className = 'range-container';
-    const val1 = Array.isArray(settingValue) && settingValue.length > 0 ? settingValue[0] : (schema.min || 0);
-    const val2 = Array.isArray(settingValue) && settingValue.length > 1 ? settingValue[1] : (schema.max || 10);
-    const minInput = document.createElement('input'); minInput.type = 'number'; minInput.id = `${fieldIdPrefix}-min`; minInput.value = val1;
-    if (schema && schema.min !== undefined) minInput.min = schema.min; if (schema && schema.max !== undefined) minInput.max = schema.max;
+
+    const rangeContainer = document.createElement('div');
+    rangeContainer.className = 'range-container';
+
+    const currentVal = (Array.isArray(settingValue) && settingValue.length === 2)
+        ? settingValue
+        : (schema && schema.default !== undefined ? schema.default : [0, 10]);
+
+    const val1 = currentVal[0];
+    const val2 = currentVal[1];
+
+    const defaultVal1Label = "Min:";
+    const defaultVal2Label = "Max:";
+    const defaultValueSeparator = "to";
+
+    const value1Label = (schema && typeof schema.value1Label === 'string') ? schema.value1Label : defaultVal1Label;
+    const value2Label = (schema && typeof schema.value2Label === 'string') ? schema.value2Label : defaultVal2Label;
+    const valueSeparator = (schema && typeof schema.valueSeparator === 'string') ? schema.valueSeparator : defaultValueSeparator;
+
+    const minInput = document.createElement('input');
+    minInput.type = 'number';
+    minInput.id = `${fieldIdPrefix}-min`;
+    minInput.value = val1;
+    if (schema && schema.min !== undefined) minInput.min = schema.min;
+    if (schema && schema.max !== undefined) minInput.max = schema.max;
     minInput.style.width = '80px';
-    const separator = document.createElement('span'); separator.textContent = ' to '; separator.style.margin = "0 5px";
-    const maxInput = document.createElement('input'); maxInput.type = 'number'; maxInput.id = `${fieldIdPrefix}-max`; maxInput.value = val2;
-    if (schema && schema.min !== undefined) maxInput.min = schema.min; if (schema && schema.max !== undefined) maxInput.max = schema.max;
+
+    const maxInput = document.createElement('input');
+    maxInput.type = 'number';
+    maxInput.id = `${fieldIdPrefix}-max`;
+    maxInput.value = val2;
+    if (schema && schema.min !== undefined) maxInput.min = schema.min;
+    if (schema && schema.max !== undefined) maxInput.max = schema.max;
     maxInput.style.width = '80px';
+
     function updateRange() {
-        const numMin = Number(minInput.value); const numMax = Number(maxInput.value);
+        const numMin = Number(minInput.value);
+        const numMax = Number(maxInput.value);
+
+        if (schema) {
+            if (schema.min !== undefined && numMin < schema.min) {
+                showNotification(`First value cannot be less than ${schema.min}. Reverting.`, 'error');
+                minInput.value = settings[modelName]?.[category]?.[settingKey]?.[0] !== undefined ? settings[modelName][category][settingKey][0] : schema.default[0];
+                return;
+            }
+            if (schema.max !== undefined && numMax > schema.max) {
+                showNotification(`Second value cannot be greater than ${schema.max}. Reverting.`, 'error');
+                maxInput.value = settings[modelName]?.[category]?.[settingKey]?.[1] !== undefined ? settings[modelName][category][settingKey][1] : schema.default[1];
+                return;
+            }
+        }
+
         if (numMin > numMax) {
-            showNotification('Minimum value in range cannot exceed maximum.', 'error');
-            minInput.value = settings[modelName][category][settingKey][0]; maxInput.value = settings[modelName][category][settingKey][1]; return;
+            showNotification('The first value in a range cannot exceed the second value. Reverting.', 'error');
+            const originalRange = settings[modelName]?.[category]?.[settingKey] || schema.default || [0,10];
+            minInput.value = originalRange[0];
+            maxInput.value = originalRange[1];
+            return;
         }
         updateSetting(modelName, category, settingKey, [numMin, numMax]);
     }
-    minInput.onchange = updateRange; maxInput.onchange = updateRange;
-    rangeContainer.appendChild(document.createTextNode("Min: ")); rangeContainer.appendChild(minInput);
-    rangeContainer.appendChild(separator); rangeContainer.appendChild(document.createTextNode("Max: ")); rangeContainer.appendChild(maxInput);
+    minInput.onchange = updateRange;
+    maxInput.onchange = updateRange;
+
+    if (value1Label) {
+        rangeContainer.appendChild(document.createTextNode(value1Label + " "));
+    }
+    rangeContainer.appendChild(minInput);
+
+    if (valueSeparator) {
+        const separatorSpan = document.createElement('span');
+        separatorSpan.textContent = ` ${valueSeparator} `;
+        separatorSpan.style.margin = "0 5px";
+        rangeContainer.appendChild(separatorSpan);
+    } else {
+        const spacer = document.createElement('span');
+        spacer.innerHTML = '&nbsp;&nbsp;';
+        rangeContainer.appendChild(spacer);
+    }
+
+    if (value2Label) {
+        rangeContainer.appendChild(document.createTextNode(value2Label + " "));
+    }
+    rangeContainer.appendChild(maxInput);
+
     container.appendChild(rangeContainer);
     return container;
 }
@@ -1017,7 +967,7 @@ function createArrayInput(modelName, category, settingKey, currentArray, arraySc
     labelContainer.className = 'label-container';
     const arrayLabel = document.createElement('label');
     arrayLabel.setAttribute('for', fieldId + '-entries');
-    arrayLabel.textContent = formatSettingName(settingKey);
+    arrayLabel.textContent = (arraySchema && arraySchema.title) ? arraySchema.title : formatSettingName(settingKey);
     labelContainer.appendChild(arrayLabel);
     if (arraySchema && arraySchema.tooltip) {
         labelContainer.appendChild(createTooltip(arraySchema.tooltip));
@@ -1050,14 +1000,14 @@ function createArrayInput(modelName, category, settingKey, currentArray, arraySc
 
     function renderArrayEntries() {
         entriesContainer.innerHTML = '';
-        
-        if (!settings[modelName]) settings[modelName] = {};
-        if (!settings[modelName][category]) settings[modelName][category] = {};
-        if (!settings[modelName][category][settingKey] || !Array.isArray(settings[modelName][category][settingKey])) {
-            settings[modelName][category][settingKey] = [];
+
+        if (!settings[modelName]?.[category]?.[settingKey] || !Array.isArray(settings[modelName][category][settingKey])) {
+             if(settings[modelName] && settings[modelName][category]) {
+                settings[modelName][category][settingKey] = JSON.parse(JSON.stringify(arraySchema.default || []));
+             }
         }
-        
         const arrayToRender = settings[modelName][category][settingKey];
+
 
         arrayToRender.forEach((itemValue, index) => {
             const entryDiv = createArrayEntryElement(modelName, category, settingKey, index, itemValue, arraySchema, renderArrayEntries);
@@ -1079,17 +1029,32 @@ function createArrayEntryElement(modelName, category, settingKey, index, itemVal
         const isVisionContextForBackupModels = (category === 'vision_settings' && settingKey === 'backup_models');
         const backupItemSelectorsContainer = document.createElement('div'); backupItemSelectorsContainer.className = 'form-row';
         const itemGroupKey = `backup_${isVisionContextForBackupModels ? 'vision' : 'llm'}_${index}`;
-        const currentItemValue = itemValue || {};
-            if (!currentItemValue.endpoint ) {
+
+        const currentItemValue = {...(arraySchema.itemSchema.default || {}), ...(itemValue || {})};
+        if (!currentItemValue.provider && arraySchema.itemSchema.provider.default) {
+             currentItemValue.provider = arraySchema.itemSchema.provider.default;
+        }
+         if (!currentItemValue.endpoint && arraySchema.itemSchema.endpoint.default) {
+             currentItemValue.endpoint = arraySchema.itemSchema.endpoint.default;
+        }
+        if (!currentItemValue.model && arraySchema.itemSchema.model.default) {
+             currentItemValue.model = arraySchema.itemSchema.model.default;
+        }
+        if (!currentItemValue.endpoint ) {
             const defaultSelections = getFirstProviderAndModelDetails(isVisionContextForBackupModels);
             if(defaultSelections.endpoint) currentItemValue.endpoint = defaultSelections.endpoint;
+             if(!currentItemValue.provider) currentItemValue.provider = defaultSelections.provider;
+             if(!currentItemValue.model) currentItemValue.model = defaultSelections.model;
         }
+
         createProviderModelSelectors(modelName, itemGroupKey, currentItemValue, backupItemSelectorsContainer, isVisionContextForBackupModels);
         entryDiv.appendChild(backupItemSelectorsContainer);
     } else {
         const inputElement = document.createElement('input');
         const itemType = (arraySchema && arraySchema.itemType) || (typeof itemValue === 'number' ? 'number' : 'text');
-        inputElement.type = itemType; inputElement.value = itemValue; inputElement.style.flexGrow = '1';
+        inputElement.type = itemType;
+        inputElement.value = itemValue !== undefined ? itemValue : (itemType === 'number' ? 0 : '');
+        inputElement.style.flexGrow = '1';
         inputElement.onchange = function() {
             const val = itemType === 'number' ? Number(this.value) : this.value;
             updateArrayValue(modelName, category, settingKey, index, val);
@@ -1104,11 +1069,12 @@ function createArrayEntryElement(modelName, category, settingKey, index, itemVal
 }
 
 function addArrayEntry(modelName, category, settingKey, arraySchema) {
-    if (!settings[modelName]) settings[modelName] = {};
-    if (!settings[modelName][category]) settings[modelName][category] = {};
-    if (!Array.isArray(settings[modelName][category][settingKey])) {
-        settings[modelName][category][settingKey] = [];
+    if (!settings[modelName]?.[category] || !Array.isArray(settings[modelName][category][settingKey])) {
+        if(settings[modelName] && settings[modelName][category]) {
+            settings[modelName][category][settingKey] = JSON.parse(JSON.stringify(arraySchema.default || []));
+        } else { return; }
     }
+
     let newItem;
     if (arraySchema && arraySchema.itemSchema && arraySchema.itemSchema.provider) {
         const isVision = (category === 'vision_settings' && settingKey === 'backup_models');
@@ -1118,6 +1084,9 @@ function addArrayEntry(modelName, category, settingKey, arraySchema) {
             endpoint: defaultSelections.endpoint,
             model: defaultSelections.model
         };
+        if(arraySchema.itemSchema.default){
+            newItem = {...newItem, ...JSON.parse(JSON.stringify(arraySchema.itemSchema.default))};
+        }
     } else {
         const itemType = (arraySchema && arraySchema.itemType) || 'text';
         newItem = itemType === 'number' ? 0 : '';
@@ -1142,8 +1111,8 @@ function createDictionaryInput(modelName, category, settingKey, currentValue, sc
         const labelContainer = document.createElement('div');
         labelContainer.className = 'label-container';
         const dictLabel = document.createElement('label');
-        dictLabel.setAttribute('for', fieldId + '-entries'); 
-        dictLabel.textContent = formatSettingName(settingKey);
+        dictLabel.setAttribute('for', fieldId + '-entries');
+        dictLabel.textContent = (schema && schema.title) ? schema.title : formatSettingName(settingKey);
         labelContainer.appendChild(dictLabel);
         if (schema && schema.tooltip) {
             labelContainer.appendChild(createTooltip(schema.tooltip));
@@ -1152,7 +1121,7 @@ function createDictionaryInput(modelName, category, settingKey, currentValue, sc
     }
 
     const dictionaryInputBox = document.createElement('div');
-    dictionaryInputBox.className = 'dictionary-input-box'; 
+    dictionaryInputBox.className = 'dictionary-input-box';
 
     const entriesContainerId = `${fieldId}-entries`;
     const entriesContainer = document.createElement('div');
@@ -1173,21 +1142,16 @@ function createDictionaryInput(modelName, category, settingKey, currentValue, sc
         }, 0);
     };
     dictionaryInputBox.appendChild(addButton);
-    
+
     fieldWrapper.appendChild(dictionaryInputBox);
 
     function renderDictEntries() {
-        let dictToRender = settings[modelName]?.[category]?.[settingKey];
-        if (typeof dictToRender !== 'object' || dictToRender === null) {
-            dictToRender = {};
-            if (settings[modelName] && settings[modelName][category]) {
-                 settings[modelName][category][settingKey] = dictToRender;
-            } else {
-                if(!settings[modelName]) settings[modelName] = {};
-                if(!settings[modelName][category]) settings[modelName][category] = {};
-                settings[modelName][category][settingKey] = dictToRender;
+        if (!settings[modelName]?.[category] || typeof settings[modelName][category][settingKey] !== 'object' || settings[modelName][category][settingKey] === null) {
+            if(settings[modelName] && settings[modelName][category]) {
+                settings[modelName][category][settingKey] = JSON.parse(JSON.stringify(schema.default || {}));
             }
         }
+        let dictToRender = settings[modelName][category][settingKey];
 
         const keyOrder = [];
         const existingKeyElements = entriesContainer.querySelectorAll('.dictionary-entry .dictionary-key input');
@@ -1213,6 +1177,7 @@ function createDictionaryInput(modelName, category, settingKey, currentValue, sc
     entriesContainer.renderEntries = renderDictEntries;
     return fieldWrapper;
 }
+
 
 function createDictionaryEntryElement(modelName, category, settingKey, dictKey, dictValue, rerenderCallback) {
     const entryDiv = document.createElement('div'); entryDiv.className = 'dictionary-entry';
@@ -1257,31 +1222,22 @@ function createDictionaryEntryElement(modelName, category, settingKey, dictKey, 
 }
 
 function addDictionaryEntry(modelName, category, settingKey) {
+    if (!settings[modelName]?.[category] || typeof settings[modelName][category][settingKey] !== 'object') {
+        if(settings[modelName] && settings[modelName][category]) {
+             const schemaForDict = settingsSchema._global[category]?.fields?.[settingKey];
+             settings[modelName][category][settingKey] = JSON.parse(JSON.stringify(schemaForDict?.default || {}));
+        } else { return; }
+    }
+    const targetDictionary = settings[modelName][category][settingKey];
+
     let newKeyBase = `new_key_`;
     let i = 1;
     let newKey = `${newKeyBase}${i}`;
-
-    if (!settings[modelName]) {
-        settings[modelName] = {};
-    }
-    if (!settings[modelName][category]) {
-        settings[modelName][category] = {};
-    }
-
-    if (typeof settings[modelName][category][settingKey] !== 'object' || settings[modelName][category][settingKey] === null) {
-        settings[modelName][category][settingKey] = {};
-    }
-
-    const targetDictionary = settings[modelName][category][settingKey];
-
     while (targetDictionary.hasOwnProperty(newKey)) {
         newKey = `${newKeyBase}${++i}`;
     }
-
     targetDictionary[newKey] = '';
-
     setUnsavedChanges();
-
     const entriesContainer = document.getElementById(`${modelName}-${category}-${settingKey}-entries`);
     if (entriesContainer && entriesContainer.renderEntries) {
         entriesContainer.renderEntries();
@@ -1289,6 +1245,7 @@ function addDictionaryEntry(modelName, category, settingKey) {
         renderModelContent(activeTab);
     }
 }
+
 
 function setUnsavedChanges() {
     if (autoSaveTimer) { clearTimeout(autoSaveTimer); }
@@ -1357,6 +1314,14 @@ function showNotification(message, type) {
 function showLoading() { document.getElementById('loading').style.display = 'flex'; }
 function hideLoading() { document.getElementById('loading').style.display = 'none'; }
 
+
+function initializeLocalSettingsObject() {
+    const newBotName = "BotName";
+    const newSettings = {};
+    newSettings[newBotName] = createBotConfigFromSchema(newBotName);
+    return newSettings;
+}
+
 async function fetchSettings() {
     showLoading();
     try {
@@ -1365,52 +1330,56 @@ async function fetchSettings() {
         if (!response.ok) {
             const responseText = await response.text().catch(() => "");
             if (response.status >= 400 || !responseText.trim() || responseText.trim() === "{}") {
-                settings = initializeDefaultSettings();
+                settings = initializeLocalSettingsObject();
             } else {
                 try {
                     const parsed = JSON.parse(responseText);
                     if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed) || Object.keys(parsed).length === 0) {
-                        settings = initializeDefaultSettings();
+                        settings = initializeLocalSettingsObject();
                     } else {
                         settings = parsed;
                     }
                 } catch (e) {
                     showNotification('Error parsing settings from server. Using defaults.', 'error');
-                    settings = initializeDefaultSettings();
+                    settings = initializeLocalSettingsObject();
                 }
             }
         } else {
             const text = await response.text();
             if (!text || !text.trim() || text.trim() === "{}") {
-                settings = initializeDefaultSettings();
+                settings = initializeLocalSettingsObject();
             } else {
                 try {
                     const parsed = JSON.parse(text);
-                        if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) {
-                        settings = initializeDefaultSettings();
+                         if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) {
+                        settings = initializeLocalSettingsObject();
                     } else {
                         settings = parsed;
                     }
                 } catch (parseError) {
                     showNotification('Invalid settings JSON from server, using defaults.', 'error');
-                    settings = initializeDefaultSettings();
+                    settings = initializeLocalSettingsObject();
                 }
             }
         }
+
         if (Object.keys(settings).length === 0) {
-            settings = initializeDefaultSettings();
+            settings = initializeLocalSettingsObject();
         }
+
         for (const modelName in settings) {
             ensureSettingsExist(modelName);
         }
+
         if (Object.keys(settings).length === 0) {
             addNewModel("BotName");
         }
         createModelTabs();
         activateTab(Object.keys(settings)[0]);
+
     } catch (error) {
         showNotification('Error fetching settings: ' + error.message, 'error');
-        settings = initializeDefaultSettings();
+        settings = initializeLocalSettingsObject();
         for (const modelName in settings) { ensureSettingsExist(modelName); }
         if (Object.keys(settings).length === 0) addNewModel("BotName");
         createModelTabs();
@@ -1420,13 +1389,6 @@ async function fetchSettings() {
     }
 }
 
-function initializeDefaultSettings() {
-    const newBotName = "BotName";
-    const newSettings = {};
-    newSettings[newBotName] = JSON.parse(JSON.stringify(defaultSettings));
-    newSettings[newBotName].bot_token = `${newBotName.toUpperCase().replace(/[^A-Z0-9_]/g, '_')}_BOT_TOKEN`;
-    return newSettings;
-}
 
 async function autoSaveSettings() {
     if (Object.keys(settings).length === 0) { showNotification("Cannot save empty settings.", "error"); return; }
@@ -1481,7 +1443,8 @@ function addNewModel(nameFromButton = "") {
     if (modelName && modelName.trim() !== '') {
         const sanitizedName = modelName.trim();
         if (settings[sanitizedName]) { if(!nameFromButton) showNotification('A model with this name already exists', 'error'); return; }
-        settings[sanitizedName] = JSON.parse(JSON.stringify(defaultSettings)); ensureSettingsExist(sanitizedName);
+        settings[sanitizedName] = createBotConfigFromSchema(sanitizedName);
+        ensureSettingsExist(sanitizedName);
         setUnsavedChanges(); createModelTabs(); activateTab(sanitizedName);
     }
 }
@@ -1489,7 +1452,8 @@ function addNewModel(nameFromButton = "") {
 function deleteModel(modelName) {
     if (!confirm(`Are you sure you want to delete the bot "${escapeHtml(modelName)}"?`)) return;
     if (Object.keys(settings).length === 1) {
-        settings[modelName] = JSON.parse(JSON.stringify(defaultSettings)); ensureSettingsExist(modelName);
+        settings[modelName] = createBotConfigFromSchema(modelName);
+        ensureSettingsExist(modelName);
         setUnsavedChanges(); renderModelContent(modelName);
         showNotification(`Bot "${escapeHtml(modelName)}" has been reset to defaults.`, 'success'); return;
     }

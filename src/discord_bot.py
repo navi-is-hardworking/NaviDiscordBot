@@ -14,20 +14,34 @@ import random
 from message_queue import MessageQueue, Role, Message
 import os
 import sys
+import re
+from rate_limit import RateLimit
 
 from typing import (
     Union,
 )
 
 class DiscordBot:
-    def __init__(self, bot_name: str, bot_token_location: str, setting_dictionary: dict, chat: chat_manager):
+    def __init__(
+        self,
+        bot_name: str,
+        bot_token_location: str,
+        setting_dictionary: dict,
+        chat: chat_manager,
+        replacement_dictionary: dict[str, str],
+        case_sensitive_replacements
+    ):
+        self.bot_name = bot_name
+        
         self.chat: chat_manager = chat
         self.bot_token_location = bot_token_location
         self.max_user_input_message_length = setting_dictionary['max_user_input_message_length']
         self.chat_clear_time = setting_dictionary['chat_clear_time']
-        # self.response_targets = set()
         
-        self.random_occurences_enabled = setting_dictionary.get('random_occurences_enabled', False)
+        self.mentions_enabled = setting_dictionary.get('random_occurences_enabled', False)
+        mention_count, mention_interval = setting_dictionary.get('mentions_per_interval', [0, 100])
+        self.mention_limit: RateLimit = RateLimit(limit=mention_count, interval=mention_interval)
+        
         
         self.monitored_servers = [int(x) for x in setting_dictionary['monitored_servers']]
         self.monitored_channels = [int(x) for x in setting_dictionary['monitored_channels']]
@@ -37,10 +51,10 @@ class DiscordBot:
         
         self.typing_delay_range = setting_dictionary['typing_delay_range']
         
-        self.bot_name = bot_name
         self.intents: discord.Intents = discord.Intents.default()
         self.intents.message_content = True
-        self.intents.message_content = True
+        self.intents.members = True
+                
         self.bot: commands.Bot = commands.Bot(command_prefix='!', intents=self.intents)
         self.processing_lock = threading.Lock()
         
@@ -49,10 +63,39 @@ class DiscordBot:
         
         self.last_message_time = -self.chat_clear_time - 1
         self.message_queue: deque[discord.Message] = deque()
-        
         self.sleeping = False
         
+        self.mention_replacement_map = {}
+        
+        self.case_sensitive_replacements = case_sensitive_replacements
+        
+        self.replacement_dictionary = {}
+        if case_sensitive_replacements:
+            self.replacement_dictionary = replacement_dictionary
+        else:
+            for key, val in replacement_dictionary.items():
+                self.replacement_dictionary[key.lower()] = val
+        
+        
         log.debug(f"Discord bot {bot_name} initialized.")
+        
+        # print(self.monitored_servers)
+        # self.debug_list_members_in_server(self.monitored_servers[0])
+        
+    
+    
+    def build_mention_map(self):
+        if not self.monitored_servers:
+            return
+        
+        for guild_id in self.monitored_servers:
+            guild = self.bot.get_guild(guild_id)
+            if guild:
+                for member in guild.members:
+                    print(f"Author Display Name: {member.display_name}, AuthorID: {member.id}")
+                    self.mention_replacement_map[f"@{member.display_name}"] = f"<@{member.id}>"
+            else:
+                log.error(f"Debug: Guild with ID {guild_id} not found by the bot.")
         
     
     
@@ -88,9 +131,9 @@ class DiscordBot:
             if response:
                 for channel in response_targets:
                     if sent:
-                        await channel.send("! " + response)
+                        await self.send(response="! " + response, channel=channel)
                     else:
-                        await channel.send(response) 
+                        await self.send(response=response, channel=channel) 
                         sent = True
             
             channel = None
@@ -106,14 +149,16 @@ class DiscordBot:
     
     
     
-    def prepare_context(self):
-        # TODO: move into the chat instead of here
+    def update_last_message_time(self):
         if (time.time() - self.last_message_time > self.chat_clear_time):
             log.debug(f"{self.bot_name}: clearing chat history")
             self.chat.truncate_memory()
-                
         self.last_message_time = time.time()
-        
+                    
+    
+    
+    def prepare_context(self):
+        # TODO: move into the chat instead of here
         response_targets = set()
         while len(self.message_queue) > 0:
             message: discord.Message = self.message_queue.popleft()
@@ -126,6 +171,7 @@ class DiscordBot:
     
     async def on_ready(self):
         log.info(f'{self.bot.user} has connected to Discord!')
+        self.build_mention_map()
         
     
     
@@ -164,9 +210,9 @@ class DiscordBot:
                     image_texts += image_text
                 
             if images_found:
+                log.message(f"found image in message: {attachment.url}")
+                log.message(f"image description: {image_texts}")
                 message.content += image_texts
-                
-            log.info(f"final content: {message.content}")
         else:
             log.warning("tried to process image but imaging was not enabled")
 
@@ -176,10 +222,12 @@ class DiscordBot:
     async def handle_admin_command(self, message: discord.Message):
         args = message.content.split(" ")
         command = args[0]
-        print(f"processing command {args}")
         log.debug(f"processing command {args}")
         
-        if command == "!wake":
+        if command == "!rag" or command == "memories":
+            self.sleeping = False
+            await message.author.send(self.chat.get_prompt_memories())
+        elif command == "!wake":
             self.sleeping = False
             await message.author.send("I wake now.")
         elif command == "!sleep":
@@ -233,33 +281,51 @@ class DiscordBot:
         return past_messages
 
 
-
-    async def send_oneshot_message(self, message: discord.Message):
-        async with message.channel.typing():
-            log.debug("trying to get messages")
-            history: list[discord.Message] = await self.get_messages(message.channel)
+    async def pre_process_message(self, message: discord.Message):
+        await self.handle_image_processing(message)
+        if message.mentions:
+            for user in message.mentions:
+                message.content = re.sub(rf"<@(?:[!&])?{user.id}>", f"@{user.display_name}", message.content)
+        
+        log.message(f"{message.author.display_name}: {message.content}")
+    
+    
+    async def send_oneshot_message(self, channel: Union[discord.TextChannel, discord.Thread, discord.VoiceChannel, discord.StageChannel]):
+        if self.mention_limit.full():
+            log.ignored("message ignored due to mention limit full")
+            return
+        self.mention_limit.add()
+        
+        async with channel.typing():
+            # log.debug("creating one shot response.")
+            history: list[discord.Message] = await self.get_messages(channel)
             msgs = []
             for msg in history:
-                log.debug(f"found message: {msg.content}")
-                if len(message.content) == 0 and len(message.attachments) == 0:
+                log.one_shot(f"found message -- {msg.author.display_name}: {msg.content}")
+                if len(msg.content) == 0 and len(msg.attachments) == 0:
+                    log.one_shot(f"ignoring message because empty: {msg.author.display_name}")
                     continue
-                await self.handle_image_processing(msg)
                 
+                await self.pre_process_message(msg)
+                        
                 name = msg.author.display_name
                 content = msg.content
                 role = Role.assistant if msg.author == self.bot.user else Role.user
+                log.one_shot(f"oneshot: ({name}): ({content})")
                 temp_msg = Message(role, content, name)
                 msgs.append(temp_msg)
             
             msgs.reverse()
+            # log.one_shot(msgs)
             response = await self.chat.get_oneshot_response(msgs)
-            log.debug(f"oneshot response: {response}")
-            await message.channel.send(response)
+            log.one_shot(f"oneshot response: {response}")
+            await self.send(response=response, channel=channel)
             # await self.bot.process_commands(message)
     
     
     
     def can_respond(self, message: discord.Message):
+        
         if not message.guild:
             return False
         
@@ -287,39 +353,60 @@ class DiscordBot:
     
     
     
+    async def send(self, response: str, channel: Union[discord.TextChannel, discord.Thread, discord.VoiceChannel, discord.StageChannel]):
+        response = re.sub(r"@[^\s]+", lambda m: self.mention_replacement_map.get(m.group(0), m.group(0)), response)
+        
+        if self.replacement_dictionary:
+            if self.case_sensitive_replacements:
+                response = re.sub(r"\w+", lambda m: self.replacement_dictionary.get(m.group(0), m.group(0)), response)
+            else:
+                response = re.sub(r"\w+", lambda m: self.replacement_dictionary.get(m.group(0).lower(), m.group(0)), response)
+            
+        await channel.send(response)
+        
+    
+    
     ######## Where messages comes in / main logic ########
     async def on_message(self, message: discord.Message):
-        
         ## never respond to !, but it could be an admin command
+        log.debug(f"message recieved -- {message.author.display_name}: {message.content}")
+        
+        if self.chat.contains_banned_input(message=message.content, name=message.author.display_name):
+            return
+        # log.debug(f"input valid: {message.content[0]}")
+        
         if not message.content.find("!"):
             if self.admin_list and message.author.id in self.admin_list:
                 await self.handle_admin_command(message)
             return
+        # log.debug(f"not a command: {message.content[0]}")
             
-        ## checks rate limit, in channel or server, has message, in guild...
+        ## checks in channel or server, has message, in guild...
         if not self.can_respond(message):
             return
+        # log.debug(f"can respond: {message.content[0]}")
+        
         
         if message.channel.id not in self.monitored_channels and message.author.id not in self.partial_ignore_list:
-            if not self.random_occurences_enabled:
+            if not self.mentions_enabled:
                 return
-            if self.bot_name.lower() in message.content.lower():
-                await self.send_oneshot_message(message)
+            # log.debug(f"self.bot.user: {self.bot.user}: {message.content[0]}")
+            if self.bot.user in message.mentions:
+                if message.id != self.bot.user.id:
+                    await self.send_oneshot_message(message.channel)
             return
+        
+        self.update_last_message_time()
+        # log.debug(f"is in monitored channel: {message.content[0]}")
+        
+        await self.pre_process_message(message)
         
         ## monitored channel maintains a running context
         if (message.author.id in self.partial_ignore_list):
             self.add_message_to_context(message.author.display_name, message.content)
             return
         
-        await self.handle_image_processing(message)
-        
-        if message.mentions:
-            for user in message.mentions:
-                message.content = message.content.replace(f"<@{user.id}>", user.display_name).replace(f"<@!{user.id}>", user.display_name)
-        
         self.message_queue.append(message)
-        
         await self.process_message_queue(message.channel)
         # await self.bot.process_commands(message)
         

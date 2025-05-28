@@ -19,7 +19,6 @@ class CompletionGenerator:
         if self.providers == None:
             self.providers = []
         
-        
         custom_url = os.environ.get("CUSTOM_COMPLETION_URL", None)
         custom_model = os.environ.get("CUSTOM_COMPLETION_MODEL", None)
         custom_key = os.environ.get("CUSTOM_COMPLETION_KEY", None)

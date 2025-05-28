@@ -135,8 +135,8 @@ or to run on cloud, configure _upload.sh (linux terminal script) and just run th
 
 <a id="set-content-intent"></a>
 
-### 5: Set Message Content Intent
-<img src="./images/set_intent.png" alt="alt text" style="width:auto;height:auto;">
+### 5: Set Intent
+<img src="./images/priv-intent.png" alt="alt text" style="width:auto;height:auto;">
 
 <a id="get-bot-token"></a>
 
@@ -147,8 +147,7 @@ or to run on cloud, configure _upload.sh (linux terminal script) and just run th
 
 ### 7: Add Bot To Server 
 <img src="./images/generate_oauth.png" alt="alt text" style="width:auto;height:auto;">
-<img src="./images/set_write_permissions.png" alt="alt text" style="width:auto;height:auto;">
-<img src="./images/copy_link.png" alt="alt text" style="width:auto;height:auto;">
+<img src="./images/bot-perm.png" alt="alt text" style="width:auto;height:auto;">
 <img src="./images/authorize_link.png" alt="alt text" style="width:auto;height:auto;">
 
 

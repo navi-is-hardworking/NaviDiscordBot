@@ -6,6 +6,7 @@ from completion_generator import CompletionGenerator
 from vision_processor import VisionProcessor
 from logger import log
 from rate_limit import RateLimit
+import re
 
 load_dotenv()
 
@@ -18,6 +19,7 @@ class chat_manager:
         params: Parameters,
         context_rate_limiter: RateLimit,
         vision_rate_limiter: RateLimit,
+        banned_inputs: list[str]
     ):
         
         self.char_name = char_name
@@ -27,6 +29,11 @@ class chat_manager:
         self.context_rate_limiter: RateLimit = context_rate_limiter
         self.vision_rate_limiter: RateLimit = vision_rate_limiter
         
+        if banned_inputs:
+            log.debug(f"found bound inputs: {banned_inputs}")
+            self.banned_inputs: re.Pattern[str] = re.compile("|".join(f"({p})" for p in banned_inputs), re.IGNORECASE)
+        else:
+            self.banned_inputs = None
         
         self.input_tokens = 0
         self.output_tokens = 0
@@ -83,8 +90,14 @@ class chat_manager:
         self.Params.prompt_manager.update_dictionary(message=message, username=name)
     
     def add_user_message(self, message: str, name: str = ""):
-        self.search(message, name)
-        self.Params.messages.append(Role.user, message, name)
+        self.search(message=message, name=name)
+        self.Params.messages.append(role=Role.user, content=message, name=name)
+        
+    def contains_banned_input(self, message: str, name: str = ""):
+        if self.banned_inputs and self.banned_inputs.search(message):
+            log.ignored(f"message from ({name}) ignored because contained banned regex: {message}")
+            return True
+        return False
 
     def add_assistant_message(self, message: str, name: str = ""):
         self.Params.messages.append(Role.assistant, message, name)
@@ -96,7 +109,9 @@ class chat_manager:
         self.Params.messages.truncate_to_min()
 
     def clear_prompt(self):
-        self.Params.prompt = {}
+        # depreciated
+        pass
+        # self.Params.clear = {}
     
     def remove_last_message(self):
         return self.Params.messages.pop()
@@ -112,10 +127,6 @@ class chat_manager:
     
     
     async def _get_completion(self, context) -> str:
-        if self.context_rate_limiter.full():
-            log.warning(f"_get_completion canceled due to exceeding user set rate limit")
-            return ""
-        self.context_rate_limiter.add()
         
         message = ""
         request = {}
@@ -138,7 +149,7 @@ class chat_manager:
                 log.debug(f"pruned message header: {message}")
                 closing = message.find(">:")
                 if closing:
-                    message = message[closing+1:].strip()
+                    message = message[len(">:"):].strip()
                 elif message.find("<think>") >= 0:
                     log.error(f"Found thinking content but could not find thinking end")
                 
@@ -148,6 +159,11 @@ class chat_manager:
         
     
     async def generate_response(self) -> str:
+        if self.context_rate_limiter.full():
+            log.warning(f"_get_completion canceled due to exceeding user set rate limit")
+            return ""
+        self.context_rate_limiter.add()
+        
         context = self.Params.to_dict()
         message, input_used, output_used = await self._get_completion(context)
         if not message:
@@ -198,9 +214,14 @@ class chat_manager:
         return f"input:({self.input_tokens}), output:({self.output_tokens})"
     
     
+    def get_prompt_memories(self) -> str:
+        return self.Params.prompt_manager.get_memories()
+    
+    
     async def get_oneshot_response(self, messages: list[Message]):
-        payload = self.Params.create_mock_payload(messages)
-        log.debug(f"sending one shot response: {payload}")
+        # put separate limiting in discord_bot.py which is going to confuse me later o7
+        payload = self.Params.create_mock_payload(messages, self.banned_inputs)
+        log.one_shot(f"sending one shot response: {payload}")
         message, input_used, output_used = await self._get_completion(payload)
         self.input_tokens += input_used
         self.output_tokens += output_used

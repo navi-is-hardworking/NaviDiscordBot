@@ -1,6 +1,7 @@
 #%%
 from collections import deque
 from serialization_definitions import Message, Role
+from logger import log
 
 '''
 
@@ -51,6 +52,7 @@ class MessageQueue:
         return item
     
     def append(self, role, content, name: str = ""):
+        log.context(f"adding message: {role} -- {content}")
         if (self.queue and self.back().role == role and self.back().name == name):
             content = self.back().content + " " + content
             self.pop()

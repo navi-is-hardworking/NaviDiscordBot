@@ -2,6 +2,7 @@ from message_queue import MessageQueue, Role, Message
 from prompt_manager import PromptManager
 from logger import log
 from serialization_definitions import Message, Role
+import re
 
 class Parameters:
     model: str
@@ -109,16 +110,20 @@ class Parameters:
         return serialized_params
         
     
-    def create_mock_payload(self, messages: list[Message]):
+    def create_mock_payload(self, messages: list[Message], banned_inputs: re.Pattern[str]):
         mockMessages = MessageQueue(self.max_context_length, self.min_context_length)
         mockPrompt = self.prompt_manager.create_mock_prompt(messages)
         
         for msg in messages:
-            mockMessages.append(msg.role, msg.content, msg.name)
+            if banned_inputs and banned_inputs.search(msg.content):
+                log.one_shot(f"message from ({msg.name}) ignored because contained banned regex: {msg.content}")
+                continue
+            mockMessages.append(role=msg.role, content=msg.content, name=msg.name)
+        log.one_shot("finished creating one shot payload")
             
         # print("finished adding messages classes")
         params = self.get_serialize_params()
-        params["messages"] = self._serialize_messages(mockMessages, mockPrompt)
+        params["messages"] = self._serialize_messages(messages=mockMessages, prompt=mockPrompt)
         return params
             
         

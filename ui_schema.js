@@ -1,3 +1,4 @@
+
 const visionOptions = {
     "Fireworks": {
         "https://api.fireworks.ai/inference/v1/chat/completions": {
@@ -70,12 +71,6 @@ let settingsSchema = {
                     tooltip: '(Optional) Header text for the dictionary_cache section. Tell the bot what the dictionary_cache means. ie. # Memories, # Notes:, # Response examples... etc...',
                     default: ""
                 },
-                dictionary_cache: {
-                    title: 'Memory Cache',
-                    type: 'dictionary',
-                    tooltip: 'Mini Rag generation for model knowledge. Keywords separated by spaces will retrieve the memory. You can set tons of these to increase the diverity and knowledge of the bots responses. Make sure all the keys are unique and have no special characters. If you find a item popping up too often, try reducing the keyword scope. For example if you set an entry like: key-> like | item-> You like to eat pancakes, Then its likely this item will get stuck in their memory very frequently. You can change it to key-> pancake pancakes | item-> You like to eat pancakes, and this will make it show up only when pancake or pancakes is mentioned.',
-                    default: {}
-                },
                 cache_capacity: {
                     title: 'Memory Capacity',
                     type: 'number',
@@ -90,6 +85,12 @@ let settingsSchema = {
                     min: 0,
                     tooltip: 'The amount of time (second) an item can exist in the cache without being triggered before it is removed. Reducing this can lower AI fixating on a single topic as long as the keyword is not being mentioned repeatedly. Set it too low, though, and it might leave the context before the AI gets a chance to respond.',
                     default: 300
+                },
+                dictionary_cache: {
+                    title: 'Memory Cache',
+                    type: 'dictionary',
+                    tooltip: 'Mini Rag generation for model knowledge. Keywords separated by spaces will retrieve the memory. You can set tons of these to increase the diverity and knowledge of the bots responses. Make sure all the keys are unique and have no special characters. If you find a item popping up too often, try reducing the keyword scope. For example if you set an entry like: key-> like | item-> You like to eat pancakes, Then its likely this item will get stuck in their memory very frequently. You can change it to key-> pancake pancakes | item-> You like to eat pancakes, and this will make it show up only when pancake or pancakes is mentioned.',
+                    default: {}
                 },
                 prompt_tail: {
                     title: 'Prompt Tail',
@@ -335,7 +336,7 @@ let settingsSchema = {
                     title: 'Monitored Server IDs',
                     type: 'array',
                     itemType: 'text',
-                    tooltip: 'Will ignore all messages not in this server (except for admin commands)',
+                    tooltip: 'List of Servers the bot can respond in globally when called with @BotName',
                     default: []
                 },
                 monitored_channels: {
@@ -349,7 +350,7 @@ let settingsSchema = {
                     title: 'Partial Ignore List (User/Bot IDs)',
                     type: 'array',
                     itemType: 'text',
-                    tooltip: 'IDs of users or bots that the bot will read, but will not trigger a response',
+                    tooltip: 'IDs of users or bots that the bot will read, but will not trigger a response. This can be used if you have two bots and you want them to be able to hear each other, but not to get stuck in an infinite loop.',
                     default: []
                 },
                 full_ignore_list: {

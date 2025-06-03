@@ -16,7 +16,7 @@ class VisionProcessor:
         primary_provider: LLM_Provider,
         backup_providers: list[LLM_Provider],
         vision_prompt: str,
-        max_output_length=300
+        max_output_length=500
     ):
         self.enabled: bool = vision_enabled
         self.providers: list[LLM_Provider] = backup_providers

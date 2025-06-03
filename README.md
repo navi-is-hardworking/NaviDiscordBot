@@ -136,7 +136,7 @@ or to run on cloud, configure _upload.sh (linux terminal script) and just run th
 <a id="set-content-intent"></a>
 
 ### 5: Set Intent
-<img src="./images/priv-intent.png" alt="alt text" style="width:auto;height:auto;">
+<img src="./images/bot-intents.png" alt="alt text" style="width:auto;height:auto;">
 
 <a id="get-bot-token"></a>
 

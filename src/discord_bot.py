@@ -281,6 +281,7 @@ class DiscordBot:
         return past_messages
 
 
+    
     async def pre_process_message(self, message: discord.Message):
         await self.handle_image_processing(message)
         if message.mentions:
@@ -288,6 +289,7 @@ class DiscordBot:
                 message.content = re.sub(rf"<@(?:[!&])?{user.id}>", f"@{user.display_name}", message.content)
         
         log.message(f"{message.author.display_name}: {message.content}")
+    
     
     
     async def send_oneshot_message(self, channel: Union[discord.TextChannel, discord.Thread, discord.VoiceChannel, discord.StageChannel]):
@@ -368,40 +370,31 @@ class DiscordBot:
     
     ######## Where messages comes in / main logic ########
     async def on_message(self, message: discord.Message):
+        
         ## never respond to !, but it could be an admin command
         log.debug(f"message recieved -- {message.author.display_name}: {message.content}")
-        
         if self.chat.contains_banned_input(message=message.content, name=message.author.display_name):
             return
-        # log.debug(f"input valid: {message.content[0]}")
         
         if not message.content.find("!"):
             if self.admin_list and message.author.id in self.admin_list:
                 await self.handle_admin_command(message)
             return
-        # log.debug(f"not a command: {message.content[0]}")
-            
-        ## checks in channel or server, has message, in guild...
+        
         if not self.can_respond(message):
             return
-        # log.debug(f"can respond: {message.content[0]}")
-        
         
         if message.channel.id not in self.monitored_channels and message.author.id not in self.partial_ignore_list:
             if not self.mentions_enabled:
                 return
-            # log.debug(f"self.bot.user: {self.bot.user}: {message.content[0]}")
             if self.bot.user in message.mentions:
                 if message.id != self.bot.user.id:
                     await self.send_oneshot_message(message.channel)
             return
         
         self.update_last_message_time()
-        # log.debug(f"is in monitored channel: {message.content[0]}")
-        
         await self.pre_process_message(message)
         
-        ## monitored channel maintains a running context
         if (message.author.id in self.partial_ignore_list):
             self.add_message_to_context(message.author.display_name, message.content)
             return

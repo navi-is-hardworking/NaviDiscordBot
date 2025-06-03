@@ -127,7 +127,6 @@ class chat_manager:
     
     
     async def _get_completion(self, context) -> str:
-        
         message = ""
         request = {}
         try:

@@ -368,19 +368,25 @@ class SettingsHandler(http.server.SimpleHTTPRequestHandler):
                 with settings_lock:
                     with open(SETTINGS_PATH, "r", encoding='utf-8') as f:
                         settings_data = f.read()
-                json.loads(settings_data) 
+                if not settings_data.strip():
+                    self.send_response(200)
+                    self.send_header("Content-type", "application/json; charset=utf-8")
+                    self.end_headers()
+                    self.wfile.write(b"{}")
+                    return
+                json.loads(settings_data)
                 self.send_response(200)
                 self.send_header("Content-type", "application/json; charset=utf-8")
                 self.end_headers()
                 self.wfile.write(settings_data.encode('utf-8'))
             except FileNotFoundError:
-                self.send_response(200) 
+                self.send_response(200)
                 self.send_header("Content-type", "application/json; charset=utf-8")
                 self.end_headers()
                 self.wfile.write(b"{}")
             except json.JSONDecodeError as e:
                 log.error(f"Invalid JSON in settings file: {e}. Sending empty JSON to client.")
-                self.send_response(200) 
+                self.send_response(200)
                 self.send_header("Content-type", "application/json; charset=utf-8")
                 self.end_headers()
                 self.wfile.write(b"{}")

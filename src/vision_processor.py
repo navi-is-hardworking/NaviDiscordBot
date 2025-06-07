@@ -3,6 +3,7 @@ from logger import log
 import json
 import os
 import re
+import time
 from rate_limit import RateLimit
 from provider_settings import LLM_Provider
 from dotenv import load_dotenv
@@ -28,6 +29,7 @@ class VisionProcessor:
         ignored_words = sorted(ignored_words, key=len, reverse=True)
         pattern_str = '|'.join(re.escape(word) for word in ignored_words)
         self.pattern = re.compile(pattern_str, re.IGNORECASE)
+        self.time_since_last_usage_log = time.time()
         
     
     def is_vision_enabled(self):
@@ -46,6 +48,18 @@ class VisionProcessor:
             
         print(final_text)
         return final_text
+    
+    def log_usage(self):
+        if (time.time() - self.time_since_last_usage_log < 300): # 5 min
+            return 
+        
+        stringl = []
+        stringl.append("VISION USAGE STATS")
+        for provider in self.providers:
+            stringl.append(f"{provider.provider}: {provider.model}\n    total requests: {provider.request_count}\n    input tokens: {provider.input_tokens}\n    output tokens: {provider.output_tokens}\n")
+        
+        log.vision_usage('\n'.join(stringl))
+        self.time_since_last_usage_log = time.time()
     
     async def read_image(self, image_url, provider_index: int=0, timeout=15):
         if not self.enabled:
@@ -101,11 +115,11 @@ class VisionProcessor:
                         log.error("failed to read image with both models")
                         return ("", 0, 0)
                     
-                    return (self.purne_response(
-                        response_json['choices'][0]['message']['content'],
-                    ),
-                    response_json['usage']['prompt_tokens'],
-                    response_json['usage']['completion_tokens'])
+                    provider.request_count += 1
+                    provider.input_tokens += response_json.get('usage', {}).get('prompt_tokens', 0)
+                    provider.output_tokens += response_json.get('usage', {}).get('completion_tokens', 0)
+                    self.log_usage()
+                    return self.purne_response(response_json['choices'][0]['message']['content'])
                     
         except Exception as e:
             log.warning(f"failed to read image {e}")

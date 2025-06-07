@@ -41,7 +41,7 @@ class PromptManager:
         return self.prompt_head or self.prompt_tail
         
         
-    def search(self, message: str, username: str, database: TLRUCache) -> None:
+    def search(self, message: str, username: str, database: TLRUCache, debug = False) -> None:
         # log.debug(f"searching")
         if (not self.prompt_dictionary):
             # log.warning("no prompt_dictionary found")
@@ -50,7 +50,8 @@ class PromptManager:
         words: list[str] = [self.pattern.sub("", t) for t in message.lower().split(' ')]
         words.append(username.lower())
         
-        log.memory(f"searching for matches in: {message}")
+        if debug:
+            log.memory(f"searching for matches in: {message}")
         for word in words:
             word = word.strip()
             if word in self.prompt_dictionary:
@@ -59,7 +60,7 @@ class PromptManager:
         
     
     def update_dictionary(self, message: str, username: str) -> None:
-        self.search(message, username, self.memory_dictionary)
+        self.search(message, username, self.memory_dictionary, True)
     
     
     def _create_prompt(self, rag_dictionary: TLRUCache) -> Message:

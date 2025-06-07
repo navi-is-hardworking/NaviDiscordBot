@@ -24,7 +24,7 @@ class chat_manager:
         
         self.char_name = char_name
         self.Params: Parameters = params
-        self.client: CompletionGenerator = completion_client
+        self.completion_generator: CompletionGenerator = completion_client
         self.vision_client: VisionProcessor = vision_client
         self.context_rate_limiter: RateLimit = context_rate_limiter
         self.vision_rate_limiter: RateLimit = vision_rate_limiter
@@ -34,12 +34,9 @@ class chat_manager:
             self.banned_inputs: re.Pattern[str] = re.compile("|".join(f"({p})" for p in banned_inputs), re.IGNORECASE)
         else:
             self.banned_inputs = None
-        
-        self.input_tokens = 0
-        self.output_tokens = 0
     
     def set_api_key(self, api_key: str = None):
-        self.client = CompletionGenerator(api_key)
+        self.completion_generator = CompletionGenerator(api_key)
 
     def set_model(self, model: str):
         self.Params.model = model
@@ -130,7 +127,7 @@ class chat_manager:
         message = ""
         request = {}
         try:
-            request = await self.client.fetch_completion(context)
+            request = await self.completion_generator.fetch_completion(context)
             message: str = request['choices'][0]['message']['content']
             initial_len = len(message)
             
@@ -148,11 +145,11 @@ class chat_manager:
                 log.debug(f"pruned message header: {message}")
                 closing = message.find(">:")
                 if closing:
-                    message = message[len(">:"):].strip()
+                    message = message[closing+len(">:"):].strip()
                 elif message.find("<think>") >= 0:
                     log.error(f"Found thinking content but could not find thinking end")
                 
-            return message, request['usage']['prompt_tokens'], request['usage']['completion_tokens']
+            return message
         except Exception as e:
             log.error(f"error generating response {e}: payload from api {request}")
         
@@ -164,13 +161,10 @@ class chat_manager:
         self.context_rate_limiter.add()
         
         context = self.Params.to_dict()
-        message, input_used, output_used = await self._get_completion(context)
+        message = await self._get_completion(context)
         if not message:
             return ""
         
-        self.input_tokens += input_used
-        self.output_tokens += output_used
-        log.info(f"==usage==\ninput: {self.input_tokens}\noutput: {self.output_tokens}")
         self.add_assistant_message(message)
             
         return message
@@ -185,12 +179,7 @@ class chat_manager:
         self.vision_rate_limiter.add()
         
         try:
-            (image_text, prompt_tokens, completion_tokens) = await self.vision_client.read_image(image_url)
-            self.input_tokens += prompt_tokens
-            self.output_tokens += completion_tokens
-            
-            log.info(f"==usage==\ninput: {self.input_tokens}\noutput: {self.output_tokens}")
-            
+            image_text = await self.vision_client.read_image(image_url)
             return image_text
         except Exception as e:
             log.error(f"error generating image to text {e}")
@@ -198,7 +187,6 @@ class chat_manager:
         
     def _print_chat(self):
         log.info('==usage==')
-        log.info(f"input:({self.input_tokens}), output:({self.output_tokens})")
         
         for message in self.Params._get_messages():
             log.info(f"{message.role}: {message.content}")
@@ -210,7 +198,7 @@ class chat_manager:
     
     
     def _get_rates(self) -> str:
-        return f"input:({self.input_tokens}), output:({self.output_tokens})"
+        return self.completion_generator.log_usage(force=True)
     
     
     def get_prompt_memories(self) -> str:
@@ -221,8 +209,6 @@ class chat_manager:
         # put separate limiting in discord_bot.py which is going to confuse me later o7
         payload = self.Params.create_mock_payload(messages, self.banned_inputs)
         log.one_shot(f"sending one shot response: {payload}")
-        message, input_used, output_used = await self._get_completion(payload)
-        self.input_tokens += input_used
-        self.output_tokens += output_used
+        message = await self._get_completion(payload)
         return message
         

@@ -5,6 +5,7 @@ import aiohttp
 import json
 from logger import log
 import os
+import time
 
 from dotenv import load_dotenv
 load_dotenv()
@@ -33,10 +34,26 @@ class CompletionGenerator:
             self.providers.insert(0, custom_provider)
         elif primairy_provider:
             self.providers.insert(0, primairy_provider)
+            
+        self.time_since_last_usage_log = time.time()
+            
         
+    def log_usage(self, force = False):
+        if (time.time() - self.time_since_last_usage_log < 300 and not force): # 5 min
+            return 
         
+        stringl = []
+        stringl.append("COMPLETION USAGE STATS")
+        for provider in self.providers:
+            stringl.append(f"{provider.provider}: {provider.model}\n    total requests: {provider.request_count}\n    input tokens: {provider.input_tokens}\n    output tokens: {provider.output_tokens}\n")
         
-    async def fetch_completion(self, payload, provider_index=0, timeout=15):
+        result = '\n'.join(stringl)
+        log.completion_usage(result)
+        self.time_since_last_usage_log = time.time()
+        return result
+        
+    
+    async def fetch_completion(self, payload: dict, provider_index=0, timeout=15):
         
         if provider_index >= len(self.providers):
             log.error(f"tried to access provider at index ({provider_index}) but was out of range")
@@ -47,6 +64,7 @@ class CompletionGenerator:
             log.debug(f"retrying completion generation with {provider.endpoint}, {provider.model}")
             
         payload['model'] = provider.model
+        payload.pop('top_k')
             
         headers = {
             "Accept": "application/json",
@@ -59,13 +77,18 @@ class CompletionGenerator:
                 async with session.post(provider.endpoint, json=payload, headers=headers, timeout=timeout) as response:
                         response_data = await response.text()
                         log.debug("recieved completion response")
-                        # log.debug(response_data)
+                        log.debug(response_data)
                         response_json: dict = json.loads(response_data)
                         error = response_json.get("error", None)
                         if error:
                             log.error(f"error getting completion from {provider.endpoint}: {provider.model}... {response_data}")
                             return await self.fetch_completion(payload=payload, provider_index=provider_index+1)
                         else:
+                            log.debug("completion success")
+                            provider.request_count += 1
+                            provider.input_tokens += response_json.get('usage', {}).get('prompt_tokens', 0)
+                            provider.output_tokens += response_json.get('usage', {}).get('completion_tokens', 0)
+                            self.log_usage()
                             return response_json
         except Exception as e:
             log.error(f"failed to get completion generation: {provider.endpoint, provider.model}")

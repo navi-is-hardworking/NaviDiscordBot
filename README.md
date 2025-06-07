@@ -67,14 +67,14 @@
 
 <!-- ## Overview -->
 
-This repo will allow users to set up their own personalized AI Character in discord.
+This repo will help you set up your own personalized discord LLM bot. Completely free with 100% uptime. 
+The guide might seem long but if you follow along, I promise its not that bad (until you get to aws).
 
-By hosting your own bot you will have full control over how the LLM behaves
-
-Building your bot requres a bit of set up but I will try to make it as easy as possible. 
+By hosting your own bot you can avoid suffering from another shapes fiasco.
 
 NOTE: I have some options set up for API providers. You can use them or you can use your own see [custom](#custom-model-notes) api endpoints. 
-This repo is lightweight and designed to run on AWS free tier. You can use it with Together AI free api to achieve completely free usage with 24/7 uptime. However, together AI api rates are limited on the free tier so I prefer to set fireworks AI as a backup. Even with constant usage you can keep the costs below $1 a month.
+Groq especially offers a pretty generous free tier model (1000+) requests depending on the model. You can stack free tier providers by setting a primary and backup providers. 
+This repo is lightweight and designed to run on AWS free tier.
 
 <!-- </div> -->
 
@@ -85,23 +85,20 @@ This repo is lightweight and designed to run on AWS free tier. You can use it wi
 
 <p style="font-size: 18px; font-weight: bold; margin-top: 0.0em; margin-bottom: 0.0em;">The Basics</p>
 
-* Python (You can just run the run.bat in the main directory if you don't have python)
+* Python (run.bat/run.sh will install python and all requirements for windows/linux respectively)
 * [Discord Bot and Bot token](#discord-application-developer)
 * [API Keys](#api-keys)
 
-Initialize settings by running the lazy_ui.py script
-Windows users can just run run.bat 
-
+1. Initialize virtual environment and settings.json file by running run.bat (Windows) or run.sh (Linux)
 1. Place both keys in the designated input fields. 
-2. Save the settings
-3. Then you can either start the bot from the UI or navigate to the src folder and run python bot.py settings/settings.json
+1. Save the settings
+1. Then you can either start the bot from the UI or navigate to the src folder and run python bot.py settings/settings.json
 
 or to run on cloud, configure _upload.sh (linux terminal script) and just run that script
 
 <p style="font-size: 18px; font-weight: bold; margin-top: 0.0em; margin-bottom: 0.0em;">For Perminant Setup</p>
 
-* 100% uptime server (Cloud provider or your own server device like raspberry pi or something)
-* Docker (or just scp all the files and download the requirements manually)
+* 100% uptime server (Cloud Server like aws, gcp, acs etc... or your own server device like raspberry pi or something)
 
 ##
 
@@ -155,7 +152,10 @@ or to run on cloud, configure _upload.sh (linux terminal script) and just run th
 
 # API keys
 
+https://console.groq.com/keys
+
 https://github.com/navi-is-hardworking/fire_chat?tab=readme-ov-file#TTT-key
+
 https://www.together.ai
 
 
@@ -174,7 +174,7 @@ https://www.together.ai
 // If you are comfortable with command line just pull
 git clone https://github.com/navi-is-hardworking/NaviDiscordBot.git
 ```
-Otherwise you can download and unzip (not recommended)
+Otherwise you can download and unzip (If you do this, make sure you move it out of the downloads folder before running it)
 <img src="./images/for-noobs.png" alt="alt text" style="width:auto;height:auto;">
 
 
@@ -193,35 +193,12 @@ Otherwise you can download and unzip (not recommended)
 
 <img src="./images/monitored-channels.png" alt="alt text" style="width:auto;height:auto;">
 
-### Note
 You can add multiple channels to the bot but the bot will share the same context across all of them. If you want them to have different context you will need to add another bot in the UI. The UI name does not affect the AI.
 
+## Note
+I keep adding settings and i'm getting tired of updating the readme. I will update the tooltips in the UI to make them explain what they do okay.
+
 <!-- </div> -->
-
-## How to run
-
-Set configurations via 
-
-```
-python lazy_ui.py
-
-// make sure to save after updating settings
-
-// then run the main bot.py file from
-
-cd src
-python bot.py
-
-```
-
-<!-- ## Change bot name
-<img src="images/change_bot_name.png" alt="alt text" style="width:600px;height:auto;"> -->
-
-<!-- ## Change prompt
-<img src="images/change_prompt.png" alt="alt text" style="width:600px;height:auto;">
-<img src="images/change_prompt_head_tail.png" alt="alt text" style="width:600px;height:auto;"> -->
-
-## Change changing prompt and dictionary paths
 
 <a id="run-the-bot"></a>
 <h1 style="font-size: 32px;
@@ -230,23 +207,16 @@ python bot.py
     line-height: 1.1;"
     align="center">Run The Bot</h1>
 
-### To run from windows locally
-```
-Just run run.bat
-```
+### You can use run.bat/run.sh (Window/Linux) to create the settings.json file
+### You can test out the bot by starting it from the UI. But for long term use you should run the bot.py
 
 
-### To run with UI
+### After you have your settings finalized, you can just run with...
 ```
 python -m venv venv
-source venv/Scripts/activate 
-python lazy_ui.py
-```
-
-### To run without UI
-```
+source venv/Scripts/activate # source venv/bin/activate for linux
 cd src
-python bot.py setting/settings.json
+python bot.py
 ```
 
 <a id="run-on-cloud"></a>
@@ -257,7 +227,10 @@ python bot.py setting/settings.json
     align="center">To The Cloud!</>
 
 <a id="make-aws"></a>
+
 ## https://aws.amazon.com
+
+### This bot can run comfortable on free tier aws micro but they have a one year limit or something. After that you can pay the $2, move to another provider, or get a homeserver.
     
 <img src="./images/create-aws.png" alt="alt text" style="width:auto;height:auto;">
 <img src="./images/aws-ec2.png" alt="alt text" style="width:auto;height:auto;">
@@ -414,7 +387,7 @@ CUSTOM_COMPLETION_KEY=
 
 # TLDR
 
-1. run.bat
+1. run.bat/run.sh
 2. set keys
 3. Add channel ID to monitored_channels
 4. Write prompt and dicitonary
@@ -435,7 +408,7 @@ CUSTOM_COMPLETION_KEY=
 
 * Currently hard codes removal of reason in Qwen models by removing all text between <reason> </reason> I will add a option to remove it in the future
 * I plan on finding more providers that offer free models so that free tier can be expanded
-* When pulling, ALWAYS backup your settings.json. I make frequent changes to formatting and you could lose your settings when running the run.bat
+* When pulling, ALWAYS backup your settings.json. I make frequent changes to formatting and you could lose your settings when running the run.bat/run.sh (lazy_ui.py)
 * The lazy UI components are all "vibe" coded. They are very unstable. You should only use them to make your settings.json. When running the model over the long term, always run via bot.py directly or through docker
 * Lazy UI component sometimes fails to kill the bot after starting resulting in hanging process. You will have to kill manually through task manager or get pid through ps aux
 * Model name needs to have no spaces in it. It is only used to set the API key and for calling via the random_occurrences (which I will rename to properly reflect how it just means the bot can respond serverwide as long as its name is mentioned)

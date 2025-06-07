@@ -119,6 +119,18 @@ class Logger:
 
     def message(self, message, *args, **kwargs):
         self.message_log.debug(message, *args, stacklevel=2, **kwargs)
+    
+    def completion_usage(self, message, *args, **kwargs):
+        log_file_path = os.path.join(LOG_DIR, "completion_usage.log")
+        timestamp = logging.Formatter('%(asctime)s', datefmt='%Y-%m-%d %H:%M:%S').format(logging.LogRecord('', 0, '', 0, '', (), None))
+        with open(log_file_path, 'w') as f:
+            f.write(f"{timestamp} - {message}\n")
+    
+    def vision_usage(self, message, *args, **kwargs):
+        log_file_path = os.path.join(LOG_DIR, "completion_usage.log")
+        timestamp = logging.Formatter('%(asctime)s', datefmt='%Y-%m-%d %H:%M:%S').format(logging.LogRecord('', 0, '', 0, '', (), None))
+        with open(log_file_path, 'w') as f:
+            f.write(f"{timestamp} - {message}\n")
 
 log = Logger()
 

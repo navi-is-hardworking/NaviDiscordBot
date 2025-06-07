@@ -120,26 +120,25 @@ class DiscordBot:
     
     async def wait_process_response(self, channel):
         async with channel.typing():
-            start_time = time.time()
-            
             await self.calculate_wait_time()
             
-            response_targets = self.prepare_context()
-            response = await self.chat.generate_response()
-            
-            sent = False
-            if response:
-                for channel in response_targets:
-                    if sent:
-                        await self.send(response="! " + response, channel=channel)
-                    else:
-                        await self.send(response=response, channel=channel) 
-                        sent = True
-            
-            channel = None
-            
-            log.debug(f"{self.bot_name}: response time: {time.time() - start_time}")
-            log.debug(f"{self.bot_name}: FULL elapsed time: {time.time() - start_time}")
+        start_time = time.time()
+        response_targets = self.prepare_context()
+        response = await self.chat.generate_response()
+        
+        sent = False
+        if response:
+            for channel in response_targets:
+                if sent:
+                    await self.send(response="! " + response, channel=channel)
+                else:
+                    await self.send(response=response, channel=channel) 
+                    sent = True
+        
+        channel = None
+        
+        log.debug(f"{self.bot_name}: response time: {time.time() - start_time}")
+        log.debug(f"{self.bot_name}: FULL elapsed time: {time.time() - start_time}")
             
     
     
@@ -224,7 +223,7 @@ class DiscordBot:
         command = args[0]
         log.debug(f"processing command {args}")
         
-        if command == "!rag" or command == "memories":
+        if command == "!rag" or command == "!memories":
             self.sleeping = False
             await message.author.send(self.chat.get_prompt_memories())
         elif command == "!wake":
@@ -293,12 +292,14 @@ class DiscordBot:
     
     
     async def send_oneshot_message(self, channel: Union[discord.TextChannel, discord.Thread, discord.VoiceChannel, discord.StageChannel]):
+        
         if self.mention_limit.full():
             log.ignored("message ignored due to mention limit full")
             return
         self.mention_limit.add()
         
         async with channel.typing():
+            start_time = time.time()
             # log.debug("creating one shot response.")
             history: list[discord.Message] = await self.get_messages(channel)
             msgs = []
@@ -321,6 +322,7 @@ class DiscordBot:
             # log.one_shot(msgs)
             response = await self.chat.get_oneshot_response(msgs)
             log.one_shot(f"oneshot response: {response}")
+            time.sleep(3 - (time.time() - start_time))
             await self.send(response=response, channel=channel)
             # await self.bot.process_commands(message)
     
@@ -365,7 +367,21 @@ class DiscordBot:
                 response = re.sub(r"\w+", lambda m: self.replacement_dictionary.get(m.group(0).lower(), m.group(0)), response)
             
         await channel.send(response)
+        # await self.test_edit(channel=channel, response=response)
         
+    
+    
+    ## Wont work because it messes with other bots being able to read and the rate limits make it look clunk :( 
+    async def test_edit(self, channel: Union[discord.TextChannel, discord.Thread, discord.VoiceChannel, discord.StageChannel], response: str, batch_size: int = 20):
+        cur = response[0:batch_size]
+        message = await channel.send(cur + "▌")  # Start with empty message
+        await asyncio.sleep(1)
+        for i in range(batch_size, len(response), batch_size):
+            cur += response[i:i+batch_size]
+            await message.edit(content=cur+"▌")
+            await asyncio.sleep(1)
+        await message.edit(content=response)
+    
     
     
     ######## Where messages comes in / main logic ########

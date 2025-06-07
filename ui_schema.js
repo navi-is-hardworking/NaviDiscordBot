@@ -1,4 +1,5 @@
 
+
 const visionOptions = {
     "Fireworks": {
         "https://api.fireworks.ai/inference/v1/chat/completions": {
@@ -34,6 +35,15 @@ const modelOptions = {
             "Llama-Vision-Free": "meta-llama/Llama-Vision-Free",
             "Deepseek Free": "deepseek-ai/DeepSeek-R1-Distill-Llama-70B-free",
             "Llama-3.3 70B": "meta-llama/Llama-3.3-70B-Instruct-Turbo",
+        }
+    },
+    "Groq": {
+        "https://api.groq.com/openai/v1/chat/completions": {
+            "Llama-4 Maverick (1k rpd)": "meta-llama/llama-4-maverick-17b-128e-instruct",
+            "Llama-4 Scout (1k rpd)": "meta-llama/llama-4-scout-17b-16e-instruct",
+            "Llama-3.1 8B Instant (14k rpd)": "llama-3.1-8b-instant",
+            "Llama-3.3 70B Ver (1k rpd)": "llama-3.3-70b-versatile",
+            "Llama-3 70B (8k context 14k rpd)": "llama3-70b-8192",
         }
     }
 };
@@ -95,7 +105,7 @@ let settingsSchema = {
                 prompt_tail: {
                     title: 'Prompt Tail',
                     type: 'text',
-                    multiline: true,
+                    multiline: false,
                     textareaSize: 'large',
                     tooltip: '(Optional) Final note for the model. Example: You are chatting in a discord server. You can set /no_think here for Qwen think models too.',
                     default: ""
@@ -120,20 +130,21 @@ let settingsSchema = {
                 provider: {
                     title: 'Provider',
                     type: 'text',
+                    tooltip: 'Primary model that will be used for generation. This model will be replaced if CUSTOM_COMPLETION_URL, CUSTOM_COMPLETION_MODEL, and CUSTOM_COMPLETION_KEY are set manually in .env',
                     hidden: true,
-                    default: "Fireworks" // Static default value based on original modelOptions
+                    default: "Groq" // Static default value based on original modelOptions
                 },
                 endpoint: {
                     title: 'Endpoint',
                     type: 'text',
                     hidden: true,
-                    default: "https://api.fireworks.ai/inference/v1/chat/completions" // Static default value
+                    default: "https://api.groq.com/openai/v1/chat/completions" // Static default value
                 },
                 model: {
                     title: 'Model',
                     type: 'text',
                     hidden: true,
-                    default: "accounts/fireworks/models/llama-v3p1-8b-instruct" // Static default value
+                    default: "llama3-70b-8192"
                 },
                 backup_models: {
                     title: 'Backup LLM Models',

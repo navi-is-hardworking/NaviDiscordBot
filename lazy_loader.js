@@ -669,30 +669,82 @@ function createProviderModelSelectors(modelName, settingsGroupKey, configObject,
 
     const sourceForOptions = isVisionSelectors ? visionOptions : modelOptions;
 
-    const providerGroup = document.createElement('div'); providerGroup.className = 'form-col';
+    const isBackupModel = settingsGroupKey.includes('backup_');
+    let arrayIndex = null;
+    let categoryKey = null;
+    let settingKey = null;
+    
+    if (isBackupModel) {
+        const match = settingsGroupKey.match(/backup_(?:llm|vision)_(\d+)/);
+        if (match) {
+            arrayIndex = parseInt(match[1]);
+            categoryKey = isVisionSelectors ? 'vision_settings' : 'llm_settings';
+            settingKey = 'backup_models';
+        }
+    }
+
+    const providerGroup = document.createElement('div'); 
+    providerGroup.className = 'form-col';
     const providerLabelText = settingsGroupKey.includes('backup_') ? 'Backup Provider' : `${isVisionSelectors ? 'Vision' : 'LLM'} Provider`;
-    const providerLabel = document.createElement('label'); providerLabel.textContent = providerLabelText;
-    const providerSelect = document.createElement('select'); providerSelect.id = `${modelName}-${settingsGroupKey}-provider`;
+    const providerLabel = document.createElement('label'); 
+    providerLabel.textContent = providerLabelText;
+    const providerSelect = document.createElement('select'); 
+    providerSelect.id = `${modelName}-${settingsGroupKey}-provider`;
 
     Object.keys(sourceForOptions).forEach(pName => {
-        const option = document.createElement('option'); option.value = pName; option.textContent = pName;
+        const option = document.createElement('option'); 
+        option.value = pName; 
+        option.textContent = pName;
         if (pName === currentProvider) option.selected = true;
         providerSelect.appendChild(option);
     });
 
     if (!currentProvider && providerSelect.options.length > 0) {
-        providerSelect.selectedIndex = 0; currentProvider = providerSelect.value; configObject[pKey] = currentProvider;
+        providerSelect.selectedIndex = 0; 
+        currentProvider = providerSelect.value; 
+        configObject[pKey] = currentProvider;
     } else if (providerSelect.options.length === 0) {
-        const option = document.createElement('option'); option.textContent = "No providers defined"; option.disabled = true; providerSelect.appendChild(option);
+        const option = document.createElement('option'); 
+        option.textContent = "No providers defined"; 
+        option.disabled = true; 
+        providerSelect.appendChild(option);
     }
 
-    providerGroup.appendChild(providerLabel); providerGroup.appendChild(providerSelect); targetElement.appendChild(providerGroup);
+    providerGroup.appendChild(providerLabel); 
+    providerGroup.appendChild(providerSelect); 
+    targetElement.appendChild(providerGroup);
 
-    const modelGroup = document.createElement('div'); modelGroup.className = 'form-col';
+    const modelGroup = document.createElement('div'); 
+    modelGroup.className = 'form-col';
     const modelLabelText = settingsGroupKey.includes('backup_') ? 'Backup Model' : 'Model';
-    const modelLabel = document.createElement('label'); modelLabel.textContent = modelLabelText;
-    const modelSelect = document.createElement('select'); modelSelect.id = `${modelName}-${settingsGroupKey}-model`;
-    modelGroup.appendChild(modelLabel); modelGroup.appendChild(modelSelect); targetElement.appendChild(modelGroup);
+    const modelLabel = document.createElement('label'); 
+    modelLabel.textContent = modelLabelText;
+    const modelSelect = document.createElement('select'); 
+    modelSelect.id = `${modelName}-${settingsGroupKey}-model`;
+    modelGroup.appendChild(modelLabel); 
+    modelGroup.appendChild(modelSelect); 
+    targetElement.appendChild(modelGroup);
+
+    function updateSettingsObject(newProvider, newEndpoint, newModel) {
+        configObject[pKey] = newProvider;
+        configObject[epKey] = newEndpoint;
+        configObject[mKey] = newModel;
+        
+        if (isBackupModel && arrayIndex !== null && categoryKey && settingKey) {
+            if (settings[modelName] && settings[modelName][categoryKey] && 
+                Array.isArray(settings[modelName][categoryKey][settingKey]) &&
+                settings[modelName][categoryKey][settingKey][arrayIndex]) {
+                
+                settings[modelName][categoryKey][settingKey][arrayIndex][pKey] = newProvider;
+                settings[modelName][categoryKey][settingKey][arrayIndex][epKey] = newEndpoint;
+                settings[modelName][categoryKey][settingKey][arrayIndex][mKey] = newModel;
+            }
+        }
+        
+        currentProvider = newProvider;
+        currentEndpoint = newEndpoint;
+        currentModel = newModel;
+    }
 
     function populateModelsAndUpdateStorage(selectedProviderName, currentSourceOptions) {
         modelSelect.innerHTML = '';
@@ -707,9 +759,12 @@ function createProviderModelSelectors(modelName, settingsGroupKey, configObject,
                 const compositeValue = `${endpointUrl}::${modelId}`;
                 if (!firstAvailableModelComposite) firstAvailableModelComposite = compositeValue;
 
-                const option = document.createElement('option'); option.value = compositeValue; option.textContent = `${modelDisplayName}`;
+                const option = document.createElement('option'); 
+                option.value = compositeValue; 
+                option.textContent = `${modelDisplayName}`;
                 if (modelId === currentModel && endpointUrl === currentEndpoint && selectedProviderName === currentProvider) {
-                    option.selected = true; modelSelectedInUI = true;
+                    option.selected = true; 
+                    modelSelectedInUI = true;
                 }
                 modelSelect.appendChild(option);
             }
@@ -720,33 +775,30 @@ function createProviderModelSelectors(modelName, settingsGroupKey, configObject,
         } else if (modelSelect.options.length === 0) {
             const option = document.createElement('option');
             option.textContent = selectedProviderName ? "No models for provider" : "Select provider";
-            option.disabled = true; modelSelect.appendChild(option);
+            option.disabled = true; 
+            modelSelect.appendChild(option);
         }
 
         const selectedComposite = modelSelect.value;
         if (selectedComposite && selectedComposite.includes("::")) {
             const [ep, mId] = selectedComposite.split("::");
-            configObject[epKey] = ep; configObject[mKey] = mId;
-            currentEndpoint = ep; currentModel = mId;
+            updateSettingsObject(selectedProviderName, ep, mId);
         } else {
-            configObject[epKey] = null; configObject[mKey] = null;
-            currentEndpoint = null; currentModel = null;
+            updateSettingsObject(selectedProviderName, null, null);
         }
     }
 
     providerSelect.onchange = function() {
         const newProvider = this.value;
-        configObject[pKey] = newProvider; currentProvider = newProvider;
-        currentEndpoint = null; currentModel = null;
         populateModelsAndUpdateStorage(newProvider, sourceForOptions);
         setUnsavedChanges();
     };
+    
     modelSelect.onchange = function() {
         const selectedComposite = this.value;
         if (selectedComposite && selectedComposite.includes("::")) {
             const [ep, mId] = selectedComposite.split("::");
-            configObject[epKey] = ep; configObject[mKey] = mId;
-            currentEndpoint = ep; currentModel = mId;
+            updateSettingsObject(currentProvider, ep, mId);
         }
         setUnsavedChanges();
     };
@@ -755,7 +807,6 @@ function createProviderModelSelectors(modelName, settingsGroupKey, configObject,
         populateModelsAndUpdateStorage(currentProvider, sourceForOptions);
     } else if (providerSelect.options.length > 0 && providerSelect.value) {
         currentProvider = providerSelect.value;
-        configObject[pKey] = currentProvider;
         populateModelsAndUpdateStorage(currentProvider, sourceForOptions);
     } else {
         populateModelsAndUpdateStorage(null, sourceForOptions);

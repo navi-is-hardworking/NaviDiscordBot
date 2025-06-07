@@ -4,7 +4,7 @@
   <p style="text-align: center; text-decoration: none; font-size: 2em;">A software engineer's guide to making friends</p>
 </div> -->
 <div align="center">
-  <h1 style="font-size: 38px; text-decoration: none;">Hosting your own discord LLM Bot</h1>
+  <h1 style="font-size: 38px; text-decoration: none;">Discord Mishapes</h1>
 
 <div style="width: 60%; text-align: center;">
     <!-- <img src="https://www.youtube.com/watch?v=Ap_idi2ddlw" alt="alt text" style="width:600px;height:auto;"> -->
@@ -67,14 +67,11 @@
 
 <!-- ## Overview -->
 
-This repo will help you set up your own personalized discord LLM bot. Completely free with 100% uptime. 
-The guide might seem long but if you follow along, I promise its not that bad (until you get to aws).
-
-By hosting your own bot you can avoid suffering from another shapes fiasco.
+This guide will help you set up your own personalized discord LLM bot. Completely free with 100% uptime. 
+It might seem long but if you follow along, I promise it's not that bad.
 
 NOTE: I have some options set up for API providers. You can use them or you can use your own see [custom](#custom-model-notes) api endpoints. 
-Groq especially offers a pretty generous free tier model (1000+) requests depending on the model. You can stack free tier providers by setting a primary and backup providers. 
-This repo is lightweight and designed to run on AWS free tier.
+Groq especially offers a pretty generous free tier model (1000+) requests on some high quality models.
 
 <!-- </div> -->
 
@@ -96,7 +93,7 @@ This repo is lightweight and designed to run on AWS free tier.
 
 or to run on cloud, configure _upload.sh (linux terminal script) and just run that script
 
-<p style="font-size: 18px; font-weight: bold; margin-top: 0.0em; margin-bottom: 0.0em;">For Perminant Setup</p>
+<p style="font-size: 18px; font-weight: bold; margin-top: 0.0em; margin-bottom: 0.0em;">For Permanent Setup</p>
 
 * 100% uptime server (Cloud Server like aws, gcp, acs etc... or your own server device like raspberry pi or something)
 
@@ -122,7 +119,7 @@ or to run on cloud, configure _upload.sh (linux terminal script) and just run th
 
 <a id="set-install-link"></a>
 
-### 3: Set Install ink to None
+### 3: Set Install Link to None
 <img src="./images/set_install_link.png" alt="alt text" style="width:auto;height:auto;">
 
 <a id="set-bot-settings"></a>
@@ -132,7 +129,7 @@ or to run on cloud, configure _upload.sh (linux terminal script) and just run th
 
 <a id="set-content-intent"></a>
 
-### 5: Set Intent
+### 5: Set Message Content Intent
 <img src="./images/bot-intents.png" alt="alt text" style="width:auto;height:auto;">
 
 <a id="get-bot-token"></a>
@@ -171,7 +168,7 @@ https://www.together.ai
 ## 1.Clone or Download the repo
 
 ```
-// If you are comfortable with command line just pull
+# If you are comfortable with command line just pull
 git clone https://github.com/navi-is-hardworking/NaviDiscordBot.git
 ```
 Otherwise you can download and unzip (If you do this, make sure you move it out of the downloads folder before running it)
@@ -196,7 +193,7 @@ Otherwise you can download and unzip (If you do this, make sure you move it out 
 You can add multiple channels to the bot but the bot will share the same context across all of them. If you want them to have different context you will need to add another bot in the UI. The UI name does not affect the AI.
 
 ## Note
-I keep adding settings and i'm getting tired of updating the readme. I will update the tooltips in the UI to make them explain what they do okay.
+I keep adding settings and I'm getting tired of updating the readme. I will update the tooltips in the UI to make them explain what they do.
 
 <!-- </div> -->
 
@@ -207,7 +204,7 @@ I keep adding settings and i'm getting tired of updating the readme. I will upda
     line-height: 1.1;"
     align="center">Run The Bot</h1>
 
-### You can use run.bat/run.sh (Window/Linux) to create the settings.json file
+### You can use run.bat/run.sh (Windows/Linux) to create the settings.json file
 ### You can test out the bot by starting it from the UI. But for long term use you should run the bot.py
 
 
@@ -225,12 +222,13 @@ python bot.py
     margin-bottom: 0.5em;
     line-height: 1.1;"
     align="center">To The Cloud!</>
+</h1>
 
 <a id="make-aws"></a>
 
 ## https://aws.amazon.com
 
-### This bot can run comfortable on free tier aws micro but they have a one year limit or something. After that you can pay the $2, move to another provider, or get a homeserver.
+### This bot can run comfortably on free tier aws micro but they have a one-year limit. After that you can pay the $2, move to another provider, or get a homeserver.
     
 <img src="./images/create-aws.png" alt="alt text" style="width:auto;height:auto;">
 <img src="./images/aws-ec2.png" alt="alt text" style="width:auto;height:auto;">
@@ -245,7 +243,7 @@ python bot.py
 
 if you made it here you are doing good.
 ```
-ls // should be empty at this point
+ls # should be empty at this point
 ```
 <img src="./images/inside-instance.png" alt="alt text" style="width:auto;height:auto;">
 
@@ -316,9 +314,8 @@ temperature               -> Regulates the randomness in token selection during 
 top_p                     -> Filters token selection range based on probability. A value of 1 means all tokens in the vocabulary are considered for selection based on their probabilities. Lower values restrict selection to only the most likely tokens.
 top_k                     -> Limits token selection to only the top k most probable tokens at each generation step. With value 50, the model considers only the 50 highest probability tokens when deciding what to generate next, discarding all other possibilities.
 frequency_penalty         -> Reduces token repetition, scales up based on the number of times a token has occured the context
-presence_penalty          -> Reduces the likelyhood a token will be selected if it has already occured in the context. (Unlike frequency penalty it only cares if the token has occured at all in the text, rather than the number of occurences)
+presence_penalty          -> Reduces the likelihood a token will be selected if it has already occured in the context. (Unlike frequency penalty it only cares if the token has occured at all in the text, rather than the number of occurences)
 n                         -> number of responses (mainly for testing, wastes tokens in most cases)
-stream                    -> a
 stop                      -> List of tokens that will cause the generation to stop when reached. (You can leave this empty most of the time in chat models. But it can be very useful when using completion models. For example, you can set closing quotes " as the stop token to get the model to finish the dialogue.)
 
 max_context_length        -> Max CHARACTER count in context NOT including prompt length. Manage costs keeping in mind that 4 characters is roughly equal to one token.
@@ -329,7 +326,7 @@ prompt_tail               -> instructions for the model
 dictionary_cache          -> Would normally be vdb but just using simple dictionary for important memories so it can run on aws micro
 cache_capacity            -> number of cached memories that can be stored at once
 cache_clear_time          -> max duration a memory will exist in context before being removed
-reminder                  -> experemental: does not work well on some models. Appends to end of context before sending. If you are using a reason model that supports /no_reason like Qwen, you can have it so /no_reason is append at the end of every message (should also set /no_reason im prompt too)
+reminder                  -> experimental: does not work well on some models. Appends to the end of context before sending. If you are using a reason model that supports /no_reason like Qwen, you can have it so /no_reason is append at the end of every message (should also set /no_reason im prompt too)
 
 ```
 
@@ -340,7 +337,7 @@ reminder                  -> experemental: does not work well on some models. Ap
 
 ```
 max_user_input_message_length        -> will truncate user messages that are too long
-max_bot_response_count_per_interval  -> to prevent oveuse. Number of times the llm can respond per interval length
+max_bot_response_count_per_interval  -> to prevent overuse. Number of times the llm can respond per interval length
 interval                             -> interval length for max_bot_response_count_per_interval time in seconds
 chat_clear_time                      -> will truncate chat to min_context_length set in model parameters
 channels                             -> channels that it will respond
@@ -375,7 +372,7 @@ CUSTOM_COMPLETION_KEY=
 # If the free model rates are too low, or one of the models is unstable, you can set backup models
 ### Setting the free TogetherAI model as primary and a cheap Fireworks model as backup means it will try to use free first, if that fails, it will try again on backup.
 ### This helps keep the quality high and the cost very low.
-### If you don't set a backup then you can use it for free albeit with very low usasge rates
+### If you don't set a backup then you can use it for free albeit with very low usage rates
 
 <img src="./images/backup-models.png" alt="alt text" style="width:auto;height:auto;">
 
@@ -411,7 +408,8 @@ CUSTOM_COMPLETION_KEY=
 * When pulling, ALWAYS backup your settings.json. I make frequent changes to formatting and you could lose your settings when running the run.bat/run.sh (lazy_ui.py)
 * The lazy UI components are all "vibe" coded. They are very unstable. You should only use them to make your settings.json. When running the model over the long term, always run via bot.py directly or through docker
 * Lazy UI component sometimes fails to kill the bot after starting resulting in hanging process. You will have to kill manually through task manager or get pid through ps aux
-* Model name needs to have no spaces in it. It is only used to set the API key and for calling via the random_occurrences (which I will rename to properly reflect how it just means the bot can respond serverwide as long as its name is mentioned)
+* Model name needs to have no spaces in it. It is only used to set the API key. 
+* Bot Responds on @Mention setting will used the actual discord bots username.
 
 
 

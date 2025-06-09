@@ -29,7 +29,6 @@ class VisionProcessor:
         ignored_words = sorted(ignored_words, key=len, reverse=True)
         pattern_str = '|'.join(re.escape(word) for word in ignored_words)
         self.pattern = re.compile(pattern_str, re.IGNORECASE)
-        self.time_since_last_usage_log = time.time()
         
     
     def is_vision_enabled(self):
@@ -50,16 +49,12 @@ class VisionProcessor:
         return final_text
     
     def log_usage(self):
-        if (time.time() - self.time_since_last_usage_log < 300): # 5 min
-            return 
-        
         stringl = []
         stringl.append("VISION USAGE STATS")
         for provider in self.providers:
-            stringl.append(f"{provider.provider}: {provider.model}\n    total requests: {provider.request_count}\n    input tokens: {provider.input_tokens}\n    output tokens: {provider.output_tokens}\n")
+            stringl.append(f"{provider.provider}: {provider.model}\n    total requests: {provider.request_count}\n    input tokens: {provider.input_tokens}\n    output tokens: {provider.output_tokens}\n    failed requests: {provider.failed_request_count}\n")
         
-        log.vision_usage('\n'.join(stringl))
-        self.time_since_last_usage_log = time.time()
+        return '\n'.join(stringl)
     
     async def read_image(self, image_url, provider_index: int=0, timeout=15):
         if not self.enabled:

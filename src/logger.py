@@ -21,7 +21,8 @@ class Logger:
             "context.log",
             "memory.log",
             "oneshot.log",
-            "ignored.log"
+            "ignored.log",
+            "error.log"
         ]
 
         self._archive_logs()
@@ -32,6 +33,7 @@ class Logger:
         self.memory_log = self.create_log("memory.log", "discord_bot_rag")
         self.oneshot_log = self.create_log("oneshot.log", "discord_bot_oneshot")
         self.ignored_log = self.create_log("ignored.log", "discord_bot_ignored")
+        self.error_log = self.create_log("error.log", "discord_bot_error")
 
     def _archive_logs(self):
         for log_base_name in self.log_files_to_manage:
@@ -103,7 +105,7 @@ class Logger:
         self.main_log.warning(message, *args, stacklevel=2, **kwargs)
 
     def error(self, message, *args, **kwargs):
-        self.main_log.error(message, *args, stacklevel=2, **kwargs)
+        self.error_log.error(message, *args, stacklevel=2, **kwargs)
 
     def context(self, message, *args, **kwargs):
         self.context_log.debug(message, *args, stacklevel=2, **kwargs)
@@ -120,17 +122,6 @@ class Logger:
     def message(self, message, *args, **kwargs):
         self.message_log.debug(message, *args, stacklevel=2, **kwargs)
     
-    def completion_usage(self, message, *args, **kwargs):
-        log_file_path = os.path.join(LOG_DIR, "completion_usage.log")
-        timestamp = logging.Formatter('%(asctime)s', datefmt='%Y-%m-%d %H:%M:%S').format(logging.LogRecord('', 0, '', 0, '', (), None))
-        with open(log_file_path, 'w') as f:
-            f.write(f"{timestamp} - {message}\n")
-    
-    def vision_usage(self, message, *args, **kwargs):
-        log_file_path = os.path.join(LOG_DIR, "completion_usage.log")
-        timestamp = logging.Formatter('%(asctime)s', datefmt='%Y-%m-%d %H:%M:%S').format(logging.LogRecord('', 0, '', 0, '', (), None))
-        with open(log_file_path, 'w') as f:
-            f.write(f"{timestamp} - {message}\n")
 
 log = Logger()
 
@@ -142,6 +133,7 @@ if __name__ == "__main__":
     log.memory("This is a memory log entry for current session.")
     log.one_shot("This is a one_shot log entry for current session.")
     log.ignored("This is an ignored log entry for current session.")
+    log.error("This is an error log entry for current session.")
     
     for i in range(2): # Reduced loop for quicker testing
         log.info(f"Test log entry {i+1} for main log in current session.")

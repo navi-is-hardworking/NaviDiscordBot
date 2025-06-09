@@ -198,7 +198,7 @@ class chat_manager:
     
     
     def _get_rates(self) -> str:
-        return self.completion_generator.log_usage(force=True)
+        return self.completion_generator.get_usage() + "\n\n" + self.vision_client.log_usage()
     
     
     def get_prompt_memories(self) -> str:

@@ -16,6 +16,7 @@ class LLM_Provider:
     input_tokens: int = 0
     output_tokens: int = 0
     request_count: int = 0
+    failed_request_count: int = 0
     
     def __post_init__(self):
         key_name = self.provider.upper() + "_API_KEY"

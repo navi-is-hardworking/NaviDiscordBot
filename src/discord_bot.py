@@ -15,6 +15,7 @@ from message_queue import MessageQueue, Role, Message
 import os
 import sys
 import re
+import traceback
 from rate_limit import RateLimit
 
 from typing import (
@@ -275,7 +276,7 @@ class DiscordBot:
     
     async def get_messages(self, channel: Union[discord.TextChannel, discord.Thread, discord.VoiceChannel, discord.StageChannel]) -> list[discord.Message]:
         past_messages = []
-        async for past_msg in channel.history(limit=20):
+        async for past_msg in channel.history(limit=25):
             past_messages.append(past_msg)
         return past_messages
 
@@ -314,7 +315,8 @@ class DiscordBot:
                 name = msg.author.display_name
                 content = msg.content
                 role = Role.assistant if msg.author == self.bot.user else Role.user
-                log.one_shot(f"oneshot: ({name}): ({content})")
+                
+                # log.one_shot(f"oneshot: ({name}): ({content})")
                 temp_msg = Message(role, content, name)
                 msgs.append(temp_msg)
             
@@ -322,9 +324,26 @@ class DiscordBot:
             # log.one_shot(msgs)
             response = await self.chat.get_oneshot_response(msgs)
             log.one_shot(f"oneshot response: {response}")
-            time.sleep(3 - (time.time() - start_time))
+            await asyncio.sleep(3 - (time.time() - start_time))
             await self.send(response=response, channel=channel)
             # await self.bot.process_commands(message)
+    
+    
+    
+    async def send(self, response: str, channel: Union[discord.TextChannel, discord.Thread, discord.VoiceChannel, discord.StageChannel]):
+        try:
+            log.context(f"sending pre-cleaned response: {response}")
+            response = re.sub(r"@[^\s]+", lambda m: self.mention_replacement_map.get(m.group(0), m.group(0)), response)
+            if self.replacement_dictionary:
+                if self.case_sensitive_replacements:
+                    response = re.sub(r"\w+", lambda m: self.replacement_dictionary.get(m.group(0), m.group(0)), response)
+                else:
+                    response = re.sub(r"\w+", lambda m: self.replacement_dictionary.get(m.group(0).lower(), m.group(0)), response)
+            
+            log.context(f"sending final response: {response}")
+            await channel.send(response)
+        except Exception as e:
+            log.error(f"error sending response {traceback.format_exc()}")
     
     
     
@@ -354,19 +373,6 @@ class DiscordBot:
             return True
             
         return False
-    
-    
-    
-    async def send(self, response: str, channel: Union[discord.TextChannel, discord.Thread, discord.VoiceChannel, discord.StageChannel]):
-        response = re.sub(r"@[^\s]+", lambda m: self.mention_replacement_map.get(m.group(0), m.group(0)), response)
-        
-        if self.replacement_dictionary:
-            if self.case_sensitive_replacements:
-                response = re.sub(r"\w+", lambda m: self.replacement_dictionary.get(m.group(0), m.group(0)), response)
-            else:
-                response = re.sub(r"\w+", lambda m: self.replacement_dictionary.get(m.group(0).lower(), m.group(0)), response)
-            
-        await channel.send(response)
         # await self.test_edit(channel=channel, response=response)
         
     

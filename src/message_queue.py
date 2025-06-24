@@ -52,7 +52,7 @@ class MessageQueue:
         return item
     
     def append(self, role, content, name: str = ""):
-        log.context(f"adding message: {role} -- {content}")
+        # log.context(f"adding message: {role} -- {content}")
         if (self.queue and self.back().role == role and self.back().name == name):
             content = self.back().content + " " + content
             self.pop()

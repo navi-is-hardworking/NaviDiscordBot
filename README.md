@@ -347,7 +347,7 @@ response_delay_range                 -> Bot will pick a random number in range a
 
 <a id="model-notes"></a>
 
-## Currently I have two providers set up and some of the models added
+## Currently I have a few default providers set up and some of the models added (Note: Some of the models have depreciated as of November 2025. You can add more options via ui_shcema.js file)
 <img src="./images/model-notes.png" alt="alt text" style="width:auto;height:auto;">
 
 <a id="custom-model-notes"></a>

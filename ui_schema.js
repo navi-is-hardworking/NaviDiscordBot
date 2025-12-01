@@ -26,7 +26,7 @@ const modelOptions = {
             "Llama-4 Maverick V": "accounts/fireworks/models/llama4-maverick-instruct-basic",
             "Qwen-2.5 32B V": "accounts/fireworks/models/qwen2p5-vl-32b-instruct",
             "Qwen-3 30B": "accounts/fireworks/models/qwen3-30b-a3b",
-            "Qwen-3 235B": "accounts/fireworks/models/qwen3-235b-a22b",
+            "Qwen-3 235B": "accounts/fireworks/models/qwen3-235b-a22b-instruct-2507",
         }
     },
     "TogetherAI": {

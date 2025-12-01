@@ -69,7 +69,6 @@ class VisionProcessor:
         if provider_index > 0:
             log.debug(f"retrying image generation with {provider.endpoint}, {provider.model}")
         
-        try:
             payload = {
                 "model": provider.model,
                 "messages": [ {
@@ -95,32 +94,29 @@ class VisionProcessor:
                 "Authorization": f"Bearer {provider.api_key}"
             }
             
-            
+        try:
             async with aiohttp.ClientSession() as session:
                 async with session.post(provider.endpoint, json=payload, headers=headers, timeout=timeout) as response:
                     response_data = await response.text()
-                    
                     log.debug(response_data)
                     response_json: dict = json.loads(response_data)
-                    error = response_json.get("error", None)
+                    
+                    error = response_json.rea("error", None)
                     if error:
-                        log.error(f"error getting image from {provider.endpoint}: {provider.model}... {response_data}")
-                        return await self.read_image(image_url=image_url, provider_index=provider_index+1)
-                    elif error:
-                        log.error("failed to read image with both models")
-                        return ("", 0, 0)
+                        raise ValueError(f"API returned error: {error}")
                     
                     provider.request_count += 1
                     provider.input_tokens += response_json.get('usage', {}).get('prompt_tokens', 0)
                     provider.output_tokens += response_json.get('usage', {}).get('completion_tokens', 0)
                     self.log_usage()
                     return self.purne_response(response_json['choices'][0]['message']['content'])
-                    
+
         except Exception as e:
-            log.warning(f"failed to read image {e}")
+            log.warning(f"failed to read image from {provider.endpoint}: {provider.model} - {e}")
             log.debug(f"image_url type: {type(image_url)}")
             log.debug(f"vision_prompt: {type(self.vision_prompt)}")
             log.debug(f"url: {type(provider.endpoint)}")
             log.debug(f"model: {type(provider.model)}")
-            return ""
+            provider.failed_request_count += 1
+            return await self.read_image(image_url=image_url, provider_index=provider_index + 1)
         

@@ -75,9 +75,7 @@ class CompletionGenerator:
                         error = response_json.get("error", None)
                         
                         if error:
-                            log.error(f"error getting completion from {provider.endpoint}: {provider.model}... {response_data}")
-                            provider.failed_request_count += 1
-                            return await self.fetch_completion(payload=payload, provider_index=provider_index+1)
+                            raise ValueError(f"API returned error: {error}")
                         else:
                             log.debug("completion success")
                             provider.request_count += 1
@@ -87,5 +85,6 @@ class CompletionGenerator:
                             return response_json
                             
         except Exception as e:
-            log.error(f"failed to get completion generation: {provider.endpoint, provider.model}")
+            log.error(f"error getting completion from {provider.endpoint}: {provider.model}... {e}")
+            provider.failed_request_count += 1
             return await self.fetch_completion(payload=payload, provider_index=provider_index+1)

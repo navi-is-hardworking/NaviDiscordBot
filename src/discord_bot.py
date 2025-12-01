@@ -88,7 +88,6 @@ class DiscordBot:
     def build_mention_map(self):
         if not self.monitored_servers:
             return
-        
         for guild_id in self.monitored_servers:
             guild = self.bot.get_guild(guild_id)
             if guild:
@@ -194,7 +193,7 @@ class DiscordBot:
         if len(message.attachments) == 0 and self.chat.can_receive_vision_request():
             return 
             
-        log.info(f"Attempting to proccess images {message.attachments}")
+        log.info(f"Attempting to proccess images {message}")
         if self.chat.is_vision_enabled():
             image_texts = f"\n# {message.author.display_name} attachments:\n"
             images_found = False

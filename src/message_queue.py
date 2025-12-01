@@ -1,4 +1,5 @@
 #%%
+
 from collections import deque
 from serialization_definitions import Message, Role
 from logger import log
@@ -56,16 +57,13 @@ class MessageQueue:
         if (self.queue and self.back().role == role and self.back().name == name):
             content = self.back().content + " " + content
             self.pop()
-        
         self.queue.append(Message(role, content, name))
         self.char_count += len(self.back().content) + len(self.back().name)
-        
         self.truncate_to_max()
     
     def append_message(self, message: Message):
         self.queue.append(message)
         self.char_count += len(message.content)
-        
         self.truncate_to_max()
         
     def clear(self):
